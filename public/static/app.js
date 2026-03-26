@@ -470,6 +470,7 @@ function showPhaseView(phId) {
     + '</div>';
 
   if (phId === 'p4') html += buildPatientSection() + buildCryptoDemo();
+  if (phId === 'p9') html += buildAILabSection();
 
   html += '<div class="steps-list">';
   for (var si = 0; si < phase.steps.length; si++) {
@@ -506,6 +507,7 @@ function showPhaseView(phId) {
 
   renderSidebar();
   updateTopPct();
+  if (phId === 'p9') wireAILabEvents();
 }
 
 function renderStepCard(s, pi, si) {
@@ -552,7 +554,9 @@ var SITE_META = {
   'securityheaders.com': { icon: '\ud83d\udee1\ufe0f', color: '#4CAF50', name: 'Security Headers' },
   'www.ssllabs.com':     { icon: '\ud83d\udd12', color: '#1565C0', name: 'SSL Labs' },
   'developer.mozilla.org': { icon: '\ud83e\udd8a', color: '#E66000', name: 'MDN Observatory' },
-  'www.gabia.com':       { icon: '\ud83c\udf10', color: '#0078D4', name: 'Gabia' }
+  'www.gabia.com':       { icon: '\ud83c\udf10', color: '#0078D4', name: 'Gabia' },
+  'www.kaggle.com':      { icon: '\ud83d\udcca', color: '#20BEFF', name: 'Kaggle' },
+  'console.cloud.google.com': { icon: '\u2601\ufe0f', color: '#4285F4', name: 'GCP Console' }
 };
 
 function getSiteMeta(url) {
@@ -1008,6 +1012,397 @@ function doCryptoMatch() {
   }
   if (orig.trim() === dec2.trim()) { cmEl.className = 'crypto-match ok'; cmEl.textContent = '\u2705 \ub9e4\uce6d \uc131\uacf5! \uc6d0\ubcf8: ' + orig + ' = \ubcf5\ud638\ud654: ' + dec2; }
   else { cmEl.className = 'crypto-match fail'; cmEl.textContent = '\u274c \ub9e4\uce6d \uc2e4\ud328! \ud0a4\ub97c \ud655\uc778\ud558\uc138\uc694.'; }
+}
+
+/* ═════════════════════════════════════════════════
+   AI MEDICAL DATA LAB — Phase 9
+   데이터셋 검색 · 가상 CSV 생성 · 자동 가공 · AI 예측 · HTML 생성
+   ═════════════════════════════════════════════════ */
+var aiLabData = null; /* raw CSV rows */
+var aiLabProcessed = null; /* processed CSV rows */
+var aiLabTab = 'dataset'; /* current tab: dataset | predict | html */
+
+function buildAILabSection() {
+  return '<div class="ai-lab-section">'
+    + '<div class="ai-lab-hdr"><div class="ai-lab-hdr-l">'
+    + '<span class="ai-lab-badge">\ud83e\udde0 AI MEDICAL DATA LAB</span>'
+    + '<span class="ai-lab-hdr-title">\uc758\ub8cc \ub370\uc774\ud130\uc14b \uac80\uc0c9 \u2192 \uc790\ub3d9 \uac00\uacf5 \u2192 AI \uc608\uce21 \u2192 HTML \uc0dd\uc131</span>'
+    + '</div></div>'
+
+    /* Dataset Search Links */
+    + '<div class="ai-lab-links">'
+    + '<a class="ai-link gcp" href="https://console.cloud.google.com/marketplace/browse?filter=solution-type:dataset&q=healthcare" target="_blank" rel="noopener">'
+    + '\u2601\ufe0f GCP Public Datasets</a>'
+    + '<a class="ai-link kaggle" href="https://www.kaggle.com/datasets?search=medical+health" target="_blank" rel="noopener">'
+    + '\ud83d\udcca Kaggle Datasets</a>'
+    + '<a class="ai-link bq" href="https://console.cloud.google.com/bigquery?p=bigquery-public-data" target="_blank" rel="noopener">'
+    + '\ud83d\uddc4 BigQuery Public Data</a>'
+    + '</div>'
+
+    /* Tab Navigation */
+    + '<div class="ai-lab-tabs">'
+    + '<button class="ai-tab' + (aiLabTab==='dataset' ? ' active' : '') + '" data-aitab="dataset">\ud83d\udccb \ub370\uc774\ud130\uc14b</button>'
+    + '<button class="ai-tab' + (aiLabTab==='predict' ? ' active' : '') + '" data-aitab="predict">\ud83e\udde0 AI \uc608\uce21</button>'
+    + '<button class="ai-tab' + (aiLabTab==='html' ? ' active' : '') + '" data-aitab="html">\ud83d\udcbe HTML \uc0dd\uc131</button>'
+    + '</div>'
+
+    /* Tab Content */
+    + '<div class="ai-lab-content" id="aiLabContent">'
+    + buildAILabTabContent(aiLabTab)
+    + '</div>'
+    + '</div>';
+}
+
+function buildAILabTabContent(tab) {
+  if (tab === 'dataset') return buildDatasetTab();
+  if (tab === 'predict') return buildPredictTab();
+  if (tab === 'html') return buildHtmlGenTab();
+  return '';
+}
+
+/* ─── DATASET TAB ─────────────────────── */
+function buildDatasetTab() {
+  var html = '<div class="ai-panel">'
+    + '<div class="ai-panel-title">\ud83d\udcc2 \uac00\uc0c1 \uc758\ub8cc \ub370\uc774\ud130\uc14b \uc0dd\uc131</div>'
+    + '<div class="ai-panel-desc">\ub2f9\ub1e8\ubcd1 \uc608\uce21\uc6a9 \uac00\uc0c1 \ud658\uc790 \ub370\uc774\ud130(Pima Indians Diabetes \ud615\uc2dd)\ub97c \uc0dd\uc131\ud569\ub2c8\ub2e4.</div>'
+    + '<div class="ai-gen-row">'
+    + '<label class="ai-lbl">\uc0dd\uc131 \ud589 \uc218:</label>'
+    + '<select class="ai-sel" id="aiRowCount">'
+    + '<option value="50">50\ud589</option><option value="100" selected>100\ud589</option>'
+    + '<option value="200">200\ud589</option><option value="500">500\ud589</option>'
+    + '</select>'
+    + '<button class="ai-btn gen" id="aiGenBtn">\ud83d\ude80 CSV \uc0dd\uc131</button>'
+    + '<button class="ai-btn dl" id="aiDlCsvBtn" style="display:' + (aiLabData ? 'inline-flex' : 'none') + '">\u2b07\ufe0f CSV \ub2e4\uc6b4\ub85c\ub4dc</button>'
+    + '</div></div>';
+
+  if (aiLabData && aiLabData.length > 0) {
+    html += '<div class="ai-panel">'
+      + '<div class="ai-panel-title">\ud83d\udcca \ub370\uc774\ud130 \ubbf8\ub9ac\ubcf4\uae30 <span class="ai-cnt">(' + aiLabData.length + '\ud589)</span></div>'
+      + buildDataTable(aiLabData, 10)
+      + '<div class="ai-process-row">'
+      + '<button class="ai-btn process" id="aiProcessBtn">\u2699\ufe0f \ub370\uc774\ud130 \uc790\ub3d9 \uac00\uacf5</button>'
+      + '<span class="ai-process-info">\uacb0\uce21\uce58 \ucc98\ub9ac \u2022 \uc815\uaddc\ud654 \u2022 \uc774\uc0c1\uce58 \uc81c\uac70 \u2022 \uc778\ucf54\ub529</span>'
+      + '</div></div>';
+  }
+
+  if (aiLabProcessed && aiLabProcessed.length > 0) {
+    html += '<div class="ai-panel done">'
+      + '<div class="ai-panel-title">\u2705 \uac00\uacf5 \uc644\ub8cc \ub370\uc774\ud130 <span class="ai-cnt">(' + aiLabProcessed.length + '\ud589)</span></div>'
+      + '<div class="ai-process-log" id="aiProcessLog">'
+      + '<div>\u2714 \uacb0\uce21\uce58 ' + aiLabProcessed._stats.nullsFilled + '\uac1c \ucc98\ub9ac\ub428</div>'
+      + '<div>\u2714 \uc218\uce58\ud615 \ucee8\ub7fc ' + aiLabProcessed._stats.normalized + '\uac1c \uc815\uaddc\ud654 (0~1)</div>'
+      + '<div>\u2714 \uc774\uc0c1\uce58 ' + aiLabProcessed._stats.outliers + '\uac1c \ud589 \uc81c\uac70</div>'
+      + '<div>\u2714 Target(Outcome) \ucee4\ub7fc \uc720\uc9c0</div>'
+      + '</div>'
+      + buildDataTable(aiLabProcessed, 10)
+      + '<button class="ai-btn dl" id="aiDlProcessedBtn">\u2b07\ufe0f \uac00\uacf5 CSV \ub2e4\uc6b4\ub85c\ub4dc</button>'
+      + '</div>';
+  }
+
+  return html;
+}
+
+function buildDataTable(data, maxRows) {
+  if (!data || data.length === 0) return '';
+  var cols = Object.keys(data[0]).filter(function(k) { return k !== '_stats'; });
+  var html = '<div class="ai-tbl-wrap"><table class="ai-tbl"><thead><tr>';
+  cols.forEach(function(c) { html += '<th>' + esc(c) + '</th>'; });
+  html += '</tr></thead><tbody>';
+  var rows = Math.min(data.length, maxRows || 10);
+  for (var i = 0; i < rows; i++) {
+    html += '<tr>';
+    cols.forEach(function(c) {
+      var v = data[i][c];
+      html += '<td>' + (typeof v === 'number' ? (v % 1 !== 0 ? v.toFixed(3) : v) : esc(String(v))) + '</td>';
+    });
+    html += '</tr>';
+  }
+  if (data.length > maxRows) html += '<tr><td colspan="' + cols.length + '" class="ai-more">\u22ee ' + (data.length - maxRows) + '\ud589 \ub354...</td></tr>';
+  html += '</tbody></table></div>';
+  return html;
+}
+
+/* ─── GENERATE SYNTHETIC MEDICAL DATA ── */
+function generateMedicalCSV(count) {
+  var data = [];
+  for (var i = 0; i < count; i++) {
+    var age = Math.floor(Math.random() * 50) + 21;
+    var pregnancies = Math.floor(Math.random() * 12);
+    var glucose = Math.floor(Math.random() * 120) + 50;
+    var bp = Math.floor(Math.random() * 60) + 40;
+    var skinThick = Math.floor(Math.random() * 50);
+    var insulin = Math.floor(Math.random() * 400);
+    var bmi = parseFloat((Math.random() * 35 + 15).toFixed(1));
+    var dpf = parseFloat((Math.random() * 1.8 + 0.08).toFixed(3));
+    /* null injection (~5%) */
+    if (Math.random() < 0.05) glucose = null;
+    if (Math.random() < 0.05) bp = null;
+    if (Math.random() < 0.05) bmi = null;
+    if (Math.random() < 0.05) insulin = null;
+    /* outcome logic */
+    var score = (glucose||100)/200 + bmi/50 + age/100 + dpf/2;
+    var outcome = score > 1.1 ? 1 : (score > 0.9 && Math.random() > 0.5 ? 1 : 0);
+    data.push({
+      Pregnancies: pregnancies, Glucose: glucose, BloodPressure: bp,
+      SkinThickness: skinThick, Insulin: insulin, BMI: bmi,
+      DiabetesPedigreeFunction: dpf, Age: age, Outcome: outcome
+    });
+  }
+  return data;
+}
+
+/* ─── AUTO PROCESS DATA ─────────────── */
+function processData(rawData) {
+  if (!rawData || rawData.length === 0) return null;
+  var numCols = ['Glucose','BloodPressure','SkinThickness','Insulin','BMI','DiabetesPedigreeFunction','Age','Pregnancies'];
+  var data = JSON.parse(JSON.stringify(rawData));
+  var nullsFilled = 0, outliers = 0, normalized = 0;
+
+  /* 1. Fill nulls with column median */
+  numCols.forEach(function(col) {
+    var vals = data.map(function(r) { return r[col]; }).filter(function(v) { return v !== null && v !== undefined; });
+    vals.sort(function(a,b) { return a-b; });
+    var median = vals[Math.floor(vals.length/2)];
+    data.forEach(function(r) {
+      if (r[col] === null || r[col] === undefined) { r[col] = median; nullsFilled++; }
+    });
+  });
+
+  /* 2. Remove outliers (IQR) */
+  numCols.forEach(function(col) {
+    var vals = data.map(function(r) { return r[col]; }).sort(function(a,b) { return a-b; });
+    var q1 = vals[Math.floor(vals.length*0.25)];
+    var q3 = vals[Math.floor(vals.length*0.75)];
+    var iqr = q3 - q1;
+    var lower = q1 - 1.5*iqr, upper = q3 + 1.5*iqr;
+    var before = data.length;
+    data = data.filter(function(r) { return r[col] >= lower && r[col] <= upper; });
+    outliers += (before - data.length);
+  });
+
+  /* 3. Normalize 0-1 */
+  numCols.forEach(function(col) {
+    var min = Infinity, max = -Infinity;
+    data.forEach(function(r) { if (r[col] < min) min = r[col]; if (r[col] > max) max = r[col]; });
+    var range = max - min || 1;
+    data.forEach(function(r) { r[col] = parseFloat(((r[col] - min) / range).toFixed(4)); });
+    normalized++;
+  });
+
+  data._stats = { nullsFilled: nullsFilled, outliers: outliers, normalized: normalized };
+  return data;
+}
+
+/* ─── PREDICT TAB ──────────────────── */
+function buildPredictTab() {
+  return '<div class="ai-panel">'
+    + '<div class="ai-panel-title">\ud83e\udde0 AI \uac74\uac15 \uc608\uce21 \uc2dc\ubbac\ub808\uc774\ud130</div>'
+    + '<div class="ai-panel-desc">\uac74\uac15 \ub370\uc774\ud130\ub97c \uc785\ub825\ud558\uba74 \ub2f9\ub1e8\ubcd1 \uc704\ud5d8\ub3c4\ub97c \uc608\uce21\ud569\ub2c8\ub2e4. (\uc2dc\ubbac\ub808\uc774\uc158 \ubaa8\ub4dc)</div>'
+    + '<div class="ai-pred-grid">'
+    + '<div class="ai-field"><label>Pregnancies (\uc784\uc2e0 \ud69f\uc218)</label><input class="ai-inp" id="aiPreg" type="number" value="2" min="0" max="20"></div>'
+    + '<div class="ai-field"><label>Glucose (\ud608\ub2f9, mg/dL)</label><input class="ai-inp" id="aiGluc" type="number" value="120" min="0" max="300"></div>'
+    + '<div class="ai-field"><label>BloodPressure (\ud608\uc555, mmHg)</label><input class="ai-inp" id="aiBP" type="number" value="70" min="0" max="200"></div>'
+    + '<div class="ai-field"><label>SkinThickness (\ud53c\ubd80\ub450\uaed8, mm)</label><input class="ai-inp" id="aiSkin" type="number" value="20" min="0" max="100"></div>'
+    + '<div class="ai-field"><label>Insulin (\uc778\uc290\ub9b0, \u03bcU/mL)</label><input class="ai-inp" id="aiIns" type="number" value="80" min="0" max="900"></div>'
+    + '<div class="ai-field"><label>BMI (\uccb4\uc9c8\ub7c9\uc9c0\uc218)</label><input class="ai-inp" id="aiBMI" type="number" value="28.5" step="0.1" min="10" max="70"></div>'
+    + '<div class="ai-field"><label>DiabetesPedigree (\uc720\uc804\uc218\uce58)</label><input class="ai-inp" id="aiDPF" type="number" value="0.35" step="0.01" min="0" max="3"></div>'
+    + '<div class="ai-field"><label>Age (\ub098\uc774)</label><input class="ai-inp" id="aiAge" type="number" value="35" min="18" max="100"></div>'
+    + '</div>'
+    + '<button class="ai-btn predict" id="aiPredictBtn">\ud83d\ude80 \uc608\uce21 \uc2e4\ud589 (Simulation)</button>'
+    + '<div class="ai-result" id="aiResult" style="display:none"></div>'
+    + '</div>'
+    + '<div class="ai-panel">'
+    + '<div class="ai-panel-title">\ud83d\udd17 \uc2e4\uc81c Vertex AI \uc5f0\ub3d9 \uc124\uc815</div>'
+    + '<div class="ai-panel-desc">\uc2e4\uc81c Vertex AI \uc5d4\ub4dc\ud3ec\uc778\ud2b8\ub97c \uc5f0\uacb0\ud558\ub824\uba74 Cloud Functions \ud504\ub85d\uc2dc\ub97c \uc124\uc815\ud558\uc138\uc694.</div>'
+    + '<div class="ai-field full"><label>Proxy Endpoint URL</label><input class="ai-inp" id="aiEndpoint" placeholder="https://your-region-your-project.cloudfunctions.net/predict"></div>'
+    + '<div class="ai-field full"><label>API Key (\uc120\ud0dd)</label><input class="ai-inp" id="aiApiKey" type="password" placeholder="\ud658\uacbd\ubcc0\uc218 \uc0ac\uc6a9 \uad8c\uc7a5"></div>'
+    + '</div>';
+}
+
+/* ─── SIMULATE PREDICTION ─────────── */
+function simulatePrediction(input) {
+  var score = 0;
+  score += (input.Glucose / 200) * 0.3;
+  score += (input.BMI / 50) * 0.2;
+  score += (input.Age / 100) * 0.15;
+  score += (input.DiabetesPedigreeFunction / 2) * 0.15;
+  score += (input.Pregnancies / 15) * 0.05;
+  score += (input.Insulin / 500) * 0.05;
+  score += (input.BloodPressure / 150) * 0.05;
+  score += (input.SkinThickness / 60) * 0.05;
+  var prob = Math.min(Math.max(score, 0.02), 0.98);
+  prob = parseFloat((prob + (Math.random() * 0.08 - 0.04)).toFixed(4));
+  prob = Math.min(Math.max(prob, 0.01), 0.99);
+
+  var risk = prob > 0.7 ? 'HIGH' : (prob > 0.4 ? 'MEDIUM' : 'LOW');
+  var riskColor = prob > 0.7 ? '#ff2d78' : (prob > 0.4 ? '#ffbe0b' : '#39ff14');
+  var riskLabel = prob > 0.7 ? '\uace0\uc704\ud5d8' : (prob > 0.4 ? '\uc8fc\uc758' : '\uc800\uc704\ud5d8');
+
+  /* top factors */
+  var factors = [
+    {name: '\ud608\ub2f9(Glucose)', val: input.Glucose, weight: input.Glucose/200*0.3},
+    {name: 'BMI', val: input.BMI, weight: input.BMI/50*0.2},
+    {name: '\ub098\uc774(Age)', val: input.Age, weight: input.Age/100*0.15},
+    {name: '\uc720\uc804\uc218\uce58(DPF)', val: input.DiabetesPedigreeFunction, weight: input.DiabetesPedigreeFunction/2*0.15}
+  ].sort(function(a,b) { return b.weight - a.weight; });
+
+  return { probability: prob, risk: risk, riskColor: riskColor, riskLabel: riskLabel, factors: factors };
+}
+
+function renderPredictionResult(result) {
+  var pct = Math.round(result.probability * 100);
+  var html = '<div class="ai-res-header">'
+    + '<div class="ai-res-prob">'
+    + '<div class="ai-res-pct" style="color:' + result.riskColor + '">' + pct + '%</div>'
+    + '<div class="ai-res-lbl">\ub2f9\ub1e8\ubcd1 \uc608\uce21 \ud655\ub960</div>'
+    + '</div>'
+    + '<div class="ai-res-risk" style="background:' + result.riskColor + '22;color:' + result.riskColor + ';border-color:' + result.riskColor + '44">'
+    + '<div class="ai-res-risk-icon">' + (result.risk==='HIGH' ? '\u26a0\ufe0f' : result.risk==='MEDIUM' ? '\u26a1' : '\u2705') + '</div>'
+    + '<div class="ai-res-risk-txt">' + result.riskLabel + '</div>'
+    + '</div></div>'
+    + '<div class="ai-res-bar"><div class="ai-res-fill" style="width:' + pct + '%;background:' + result.riskColor + '"></div></div>'
+    + '<div class="ai-res-factors"><div class="ai-fac-title">\ud83d\udcca \uc8fc\uc694 \uc601\ud5a5 \uc694\uc778</div>';
+  result.factors.forEach(function(f) {
+    var w = Math.round(f.weight * 100);
+    html += '<div class="ai-fac"><span class="ai-fac-name">' + esc(f.name) + '</span>'
+      + '<span class="ai-fac-val">' + f.val + '</span>'
+      + '<div class="ai-fac-bar"><div style="width:' + Math.min(w*2, 100) + '%;background:' + result.riskColor + '"></div></div></div>';
+  });
+  html += '</div>'
+    + '<div class="ai-res-note">\u26a0\ufe0f \uc774 \uacb0\uacfc\ub294 \uc2dc\ubbac\ub808\uc774\uc158\uc774\uba70 \uc2e4\uc81c \uc758\ub8cc \uc9c4\ub2e8 \ubaa9\uc801\uc73c\ub85c \uc0ac\uc6a9\ud560 \uc218 \uc5c6\uc2b5\ub2c8\ub2e4.</div>';
+  return html;
+}
+
+/* ─── HTML GENERATION TAB ─────────── */
+function buildHtmlGenTab() {
+  return '<div class="ai-panel">'
+    + '<div class="ai-panel-title">\ud83d\udcbe AI \uc608\uce21 \uc6f9\uc571 HTML \uc0dd\uc131\uae30</div>'
+    + '<div class="ai-panel-desc">\ub2f9\ub1e8\ubcd1 \uc608\uce21 AI \ubaa8\ub378\uc774 \ud3ec\ud568\ub41c \ub3c5\ub9bd\uc2e4\ud589 HTML \ud30c\uc77c\uc744 \uc0dd\uc131\ud569\ub2c8\ub2e4.</div>'
+    + '<div class="ai-html-form">'
+    + '<div class="ai-field full"><label>\ud398\uc774\uc9c0 \uc81c\ubaa9</label><input class="ai-inp" id="aiHtmlTitle" value="AI \uac74\uac15 \uc608\uce21 \uc2dc\uc2a4\ud15c"></div>'
+    + '<div class="ai-field full"><label>API Proxy URL (\uc120\ud0dd)</label><input class="ai-inp" id="aiHtmlEndpoint" placeholder="https://your-functions-url/predict"></div>'
+    + '<div class="ai-field full"><label>\ub514\uc790\uc778 \ud14c\ub9c8</label>'
+    + '<select class="ai-sel" id="aiHtmlTheme"><option value="medical">\uc758\ub8cc (\ud30c\ub780\uc0c9)</option><option value="dark">\ub2e4\ud06c</option><option value="light">\ub77c\uc774\ud2b8</option></select></div>'
+    + '</div>'
+    + '<div class="ai-html-actions">'
+    + '<button class="ai-btn gen" id="aiGenHtmlBtn">\ud83d\ude80 HTML \uc0dd\uc131 & \ubbf8\ub9ac\ubcf4\uae30</button>'
+    + '<button class="ai-btn dl" id="aiDlHtmlBtn" style="display:none">\u2b07\ufe0f HTML \ub2e4\uc6b4\ub85c\ub4dc</button>'
+    + '</div>'
+    + '<div id="aiHtmlPreview" class="ai-html-preview"></div>'
+    + '</div>';
+}
+
+function generatePredictionHTML(title, endpoint, theme) {
+  var colors = {
+    medical: {bg:'#f0f7ff', card:'#ffffff', accent:'#2563eb', text:'#1e293b'},
+    dark: {bg:'#0f172a', card:'#1e293b', accent:'#06b6d4', text:'#e2e8f0'},
+    light: {bg:'#ffffff', card:'#f8fafc', accent:'#7c3aed', text:'#334155'}
+  }[theme] || {bg:'#f0f7ff',card:'#ffffff',accent:'#2563eb',text:'#1e293b'};
+
+  return '<!DOCTYPE html>\n<html lang=\"ko\">\n<head>\n<meta charset=\"UTF-8\">\n<meta name=\"viewport\" content=\"width=device-width,initial-scale=1.0\">\n<title>' + esc(title) + '</title>\n<script src=\"https://cdn.tailwindcss.com\"><\/script>\n<style>\n  body{background:' + colors.bg + ';color:' + colors.text + ';font-family:\"Noto Sans KR\",sans-serif;}\n  .card{background:' + colors.card + ';border-radius:16px;box-shadow:0 4px 24px rgba(0,0,0,0.08);padding:32px;margin:20px auto;max-width:600px;}\n  .accent{color:' + colors.accent + ';}\n  input{width:100%;padding:10px 14px;border:1px solid #ddd;border-radius:8px;margin:4px 0 12px;font-size:15px;}\n  .btn{background:' + colors.accent + ';color:#fff;border:none;padding:14px 28px;border-radius:10px;font-size:16px;cursor:pointer;width:100%;margin-top:12px;}\n  .btn:hover{opacity:0.9;}\n  .result{margin-top:20px;padding:20px;border-radius:12px;text-align:center;}\n  .prob{font-size:3rem;font-weight:900;}\n  .bar{height:12px;border-radius:6px;background:#e5e7eb;margin:12px 0;overflow:hidden;}\n  .fill{height:100%;border-radius:6px;transition:width 0.8s;}\n</style>\n</head>\n<body>\n<div class=\"card\" style=\"text-align:center;margin-top:40px;\">\n  <h1 class=\"accent\" style=\"font-size:1.6rem;margin-bottom:8px;\">\ud83e\udde0 ' + esc(title) + '</h1>\n  <p style=\"color:#888;font-size:0.85rem;\">\uac74\uac15 \ub370\uc774\ud130\ub97c \uc785\ub825\ud558\uace0 AI \uc608\uce21\uc744 \ubc1b\uc544\ubcf4\uc138\uc694</p>\n</div>\n<div class=\"card\">\n  <div style=\"display:grid;grid-template-columns:1fr 1fr;gap:8px;\">\n    <div><label>Pregnancies</label><input type=\"number\" id=\"p\" value=\"2\"></div>\n    <div><label>Glucose (mg/dL)</label><input type=\"number\" id=\"g\" value=\"120\"></div>\n    <div><label>BloodPressure</label><input type=\"number\" id=\"bp\" value=\"70\"></div>\n    <div><label>SkinThickness</label><input type=\"number\" id=\"st\" value=\"20\"></div>\n    <div><label>Insulin</label><input type=\"number\" id=\"i\" value=\"80\"></div>\n    <div><label>BMI</label><input type=\"number\" id=\"b\" value=\"28.5\" step=\"0.1\"></div>\n    <div><label>DPF (\uc720\uc804)</label><input type=\"number\" id=\"d\" value=\"0.35\" step=\"0.01\"></div>\n    <div><label>Age</label><input type=\"number\" id=\"a\" value=\"35\"></div>\n  </div>\n  <button class=\"btn\" onclick=\"predict()\">\ud83d\ude80 \uc608\uce21 \uc2e4\ud589</button>\n  <div id=\"res\" class=\"result\" style=\"display:none;\"></div>\n</div>\n<div class=\"card\" style=\"text-align:center;font-size:0.7rem;color:#aaa;\">\n  \u26a0\ufe0f \uc2dc\ubbac\ub808\uc774\uc158 \uc804\uc6a9 \u2014 \uc2e4\uc81c \uc758\ub8cc \uc9c4\ub2e8 \ubaa9\uc801\uc73c\ub85c \uc0ac\uc6a9 \ubd88\uac00<br>\n  \u00a9 2026. WebDo (Yeon Je-jin) All rights reserved.\n</div>\n<script>\n' + (endpoint ? 'var PROXY=\"' + esc(endpoint) + '\";\nasync function predict(){\n  var data={Pregnancies:+gv(\"p\"),Glucose:+gv(\"g\"),BloodPressure:+gv(\"bp\"),SkinThickness:+gv(\"st\"),Insulin:+gv(\"i\"),BMI:+gv(\"b\"),DiabetesPedigreeFunction:+gv(\"d\"),Age:+gv(\"a\")};\n  try{\n    var r=await fetch(PROXY,{method:\"POST\",headers:{\"Content-Type\":\"application/json\"},body:JSON.stringify(data)});\n    var j=await r.json(); showResult(j.probability||j.predictions[0]);\n  }catch(e){simulate(data);}\n}\n' : 'function predict(){var data={Pregnancies:+gv(\"p\"),Glucose:+gv(\"g\"),BloodPressure:+gv(\"bp\"),SkinThickness:+gv(\"st\"),Insulin:+gv(\"i\"),BMI:+gv(\"b\"),DiabetesPedigreeFunction:+gv(\"d\"),Age:+gv(\"a\")};simulate(data);}\n') + 'function gv(id){return document.getElementById(id).value;}\nfunction simulate(d){var s=d.Glucose/200*0.3+d.BMI/50*0.2+d.Age/100*0.15+d.DiabetesPedigreeFunction/2*0.15+d.Pregnancies/15*0.05+d.Insulin/500*0.05+d.BloodPressure/150*0.05+d.SkinThickness/60*0.05;s=Math.min(Math.max(s+(Math.random()*0.08-0.04),0.01),0.99);showResult(s);}\nfunction showResult(p){var pct=Math.round(p*100);var c=p>0.7?\"#ef4444\":p>0.4?\"#f59e0b\":\"#22c55e\";var l=p>0.7?\"\uace0\uc704\ud5d8\":p>0.4?\"\uc8fc\uc758\":\"\uc800\uc704\ud5d8\";var el=document.getElementById(\"res\");el.style.display=\"block\";el.innerHTML=\"<div class=\\\"prob\\\" style=\\\"color:\"+c+\"\\\">\"+pct+\"%</div><div style=\\\"font-size:1.1rem;font-weight:700;color:\"+c+\"\\\">\"+l+\"</div><div class=\\\"bar\\\"><div class=\\\"fill\\\" style=\\\"width:\"+pct+\"%;background:\"+c+\"\\\"></div></div><div style=\\\"font-size:0.8rem;color:#888;margin-top:8px;\\\">\ub2f9\ub1e8\ubcd1 \uc608\uce21 \ud655\ub960 (\uc2dc\ubbac\ub808\uc774\uc158)</div>\";}\n<\/script>\n</body>\n</html>';
+}
+
+function downloadFile(filename, content, mime) {
+  var blob = new Blob([content], {type: mime || 'text/plain'});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function csvFromData(data) {
+  if (!data || data.length === 0) return '';
+  var cols = Object.keys(data[0]).filter(function(k) { return k !== '_stats'; });
+  var lines = [cols.join(',')];
+  data.forEach(function(row) {
+    lines.push(cols.map(function(c) { return row[c] === null ? '' : row[c]; }).join(','));
+  });
+  return lines.join('\n');
+}
+
+/* ─── AI LAB EVENT WIRING ──────────── */
+function wireAILabEvents() {
+  var ci = document.getElementById('contentInner');
+  if (!ci) return;
+  ci.addEventListener('click', function(e) {
+    /* Tab switching */
+    var tabBtn = e.target.closest('[data-aitab]');
+    if (tabBtn) {
+      aiLabTab = tabBtn.getAttribute('data-aitab');
+      var content = document.getElementById('aiLabContent');
+      if (content) content.innerHTML = buildAILabTabContent(aiLabTab);
+      document.querySelectorAll('.ai-tab').forEach(function(t) { t.classList.toggle('active', t.getAttribute('data-aitab') === aiLabTab); });
+      return;
+    }
+    /* Generate CSV */
+    if (e.target.closest('#aiGenBtn')) {
+      var count = parseInt(document.getElementById('aiRowCount').value) || 100;
+      aiLabData = generateMedicalCSV(count);
+      aiLabProcessed = null;
+      showPhaseView('p9');
+      showToast('\ud83d\ude80 ' + count + '\ud589 \uc758\ub8cc \ub370\uc774\ud130 \uc0dd\uc131 \uc644\ub8cc!');
+      return;
+    }
+    /* Download raw CSV */
+    if (e.target.closest('#aiDlCsvBtn') && aiLabData) {
+      downloadFile('medical_data_raw.csv', csvFromData(aiLabData), 'text/csv');
+      return;
+    }
+    /* Process data */
+    if (e.target.closest('#aiProcessBtn') && aiLabData) {
+      aiLabProcessed = processData(aiLabData);
+      showPhaseView('p9');
+      showToast('\u2705 \ub370\uc774\ud130 \uc790\ub3d9 \uac00\uacf5 \uc644\ub8cc!');
+      return;
+    }
+    /* Download processed CSV */
+    if (e.target.closest('#aiDlProcessedBtn') && aiLabProcessed) {
+      downloadFile('medical_data_processed.csv', csvFromData(aiLabProcessed), 'text/csv');
+      return;
+    }
+    /* Predict */
+    if (e.target.closest('#aiPredictBtn')) {
+      var input = {
+        Pregnancies: parseFloat(document.getElementById('aiPreg').value) || 0,
+        Glucose: parseFloat(document.getElementById('aiGluc').value) || 100,
+        BloodPressure: parseFloat(document.getElementById('aiBP').value) || 70,
+        SkinThickness: parseFloat(document.getElementById('aiSkin').value) || 20,
+        Insulin: parseFloat(document.getElementById('aiIns').value) || 80,
+        BMI: parseFloat(document.getElementById('aiBMI').value) || 25,
+        DiabetesPedigreeFunction: parseFloat(document.getElementById('aiDPF').value) || 0.3,
+        Age: parseFloat(document.getElementById('aiAge').value) || 30
+      };
+      var result = simulatePrediction(input);
+      var resEl = document.getElementById('aiResult');
+      resEl.innerHTML = renderPredictionResult(result);
+      resEl.style.display = 'block';
+      showToast('\ud83e\udde0 \uc608\uce21 \uc644\ub8cc! \ub2f9\ub1e8 \ud655\ub960: ' + Math.round(result.probability * 100) + '%');
+      return;
+    }
+    /* Generate HTML */
+    if (e.target.closest('#aiGenHtmlBtn')) {
+      var title = document.getElementById('aiHtmlTitle').value || 'AI \uac74\uac15 \uc608\uce21 \uc2dc\uc2a4\ud15c';
+      var endpoint = document.getElementById('aiHtmlEndpoint').value || '';
+      var theme = document.getElementById('aiHtmlTheme').value || 'medical';
+      var htmlContent = generatePredictionHTML(title, endpoint, theme);
+      var preview = document.getElementById('aiHtmlPreview');
+      preview.innerHTML = '<div class="ai-preview-frame"><iframe srcdoc="' + htmlContent.replace(/"/g, '&quot;') + '" style="width:100%;height:500px;border:none;border-radius:10px;"></iframe></div>';
+      var dlBtn = document.getElementById('aiDlHtmlBtn');
+      if (dlBtn) { dlBtn.style.display = 'inline-flex'; dlBtn._htmlContent = htmlContent; dlBtn._title = title; }
+      showToast('\ud83d\ude80 HTML \uc0dd\uc131 \uc644\ub8cc! \ubbf8\ub9ac\ubcf4\uae30\ub97c \ud655\uc778\ud558\uc138\uc694.');
+      return;
+    }
+    /* Download HTML */
+    if (e.target.closest('#aiDlHtmlBtn')) {
+      var dlBtn2 = document.getElementById('aiDlHtmlBtn');
+      if (dlBtn2 && dlBtn2._htmlContent) {
+        downloadFile((dlBtn2._title || 'ai_prediction') + '.html', dlBtn2._htmlContent, 'text/html');
+      }
+      return;
+    }
+  });
 }
 
 /* ─── MODAL ──────────────────────────────────── */
