@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════
-   STELLAR EDU v8.1 — Navigator Turbo Edition
-   즉시 체크 + 원클릭 네비게이션 + 자동 iframe 전환
-   학생 체감 속도 3배 향상
+   STELLAR EDU v8.2 — Open Tab Navigator Edition
+   새 탭 열기 + 우측 상세 가이드 + 즉시 체크 + 키보드 지원
+   외부 사이트 iframe 차단 우회: window.open() 방식
    ═══════════════════════════════════════════════════════ */
 (function() {
 'use strict';
@@ -396,14 +396,40 @@ function renderStepCard(s, pi, si) {
 }
 
 /* ═════════════════════════════════════════════════
-   NAVIGATOR MODE v2 — Turbo Edition
-   원클릭 체크 + 자동 iframe 전환 + 속도 3배
+   NAVIGATOR MODE v3 — Open Tab Edition
+   좌측: 체크리스트 + 우측: 현재 항목 상세 가이드
+   클릭하면 새 탭으로 사이트 열기 (iframe 차단 우회)
    ═════════════════════════════════════════════════ */
 var navActive = false;
 var navStepId = null;
 var navTaskIdx = 0;
 var navSavedChecks = {};
 var navNavInfo = null;
+var navOpenedTabs = {};
+
+/* 도메인별 파비콘 + 색상 매핑 */
+var SITE_META = {
+  'accounts.google.com': { icon: '\ud83d\udd11', color: '#4285F4', name: 'Google' },
+  'supabase.com':        { icon: '\ud83d\udfe2', color: '#3ECF8E', name: 'Supabase' },
+  'github.com':          { icon: '\ud83d\udc19', color: '#f0f6fc', name: 'GitHub' },
+  'dash.cloudflare.com': { icon: '\u2601\ufe0f', color: '#F6821F', name: 'Cloudflare' },
+  'cloudflare.com':      { icon: '\u2601\ufe0f', color: '#F6821F', name: 'Cloudflare' },
+  'claude.ai':           { icon: '\ud83e\udde0', color: '#CC7832', name: 'Claude AI' },
+  'www.genspark.ai':     { icon: '\u2728',       color: '#6366F1', name: 'GenSpark' },
+  'web.telegram.org':    { icon: '\ud83d\udcac', color: '#229ED9', name: 'Telegram' },
+  't.me':                { icon: '\ud83e\udd16', color: '#229ED9', name: 'Telegram Bot' },
+  'console.cloud.google.com': { icon: '\u2601\ufe0f', color: '#4285F4', name: 'GCP Console' },
+  'securityheaders.com': { icon: '\ud83d\udee1\ufe0f', color: '#4CAF50', name: 'Security Headers' },
+  'www.ssllabs.com':     { icon: '\ud83d\udd12', color: '#1565C0', name: 'SSL Labs' },
+  'developer.mozilla.org': { icon: '\ud83e\udd8a', color: '#E66000', name: 'MDN Observatory' },
+  'www.gabia.com':       { icon: '\ud83c\udf10', color: '#0078D4', name: 'Gabia' }
+};
+
+function getSiteMeta(url) {
+  if (!url) return { icon: '\ud83d\udcbb', color: '#888', name: '\ub85c\uceec \uc791\uc5c5' };
+  try { var d = new URL(url).hostname; return SITE_META[d] || { icon: '\ud83c\udf10', color: '#888', name: d }; }
+  catch(e) { return { icon: '\ud83c\udf10', color: '#888', name: url.substring(0,30) }; }
+}
 
 function enterNavMode(stepId) {
   var navInfo = NAV_DATA[stepId];
@@ -412,7 +438,6 @@ function enterNavMode(stepId) {
     return;
   }
 
-  /* Find step data */
   var step = null, pi = -1, si = -1;
   for (var i = 0; i < PH.length; i++) {
     for (var j = 0; j < PH[i].steps.length; j++) {
@@ -426,11 +451,10 @@ function enterNavMode(stepId) {
   navStepId = stepId;
   navTaskIdx = 0;
   navNavInfo = navInfo;
+  navOpenedTabs = {};
 
-  /* Load task check state */
   try { navSavedChecks = JSON.parse(localStorage.getItem(SK + '_tc_' + stepId) || '{}'); } catch(e) { navSavedChecks = {}; }
 
-  /* Find first unchecked task */
   var firstUnchecked = 0;
   for (var f = 0; f < navInfo.nav.length; f++) {
     if (!navSavedChecks[f]) { firstUnchecked = f; break; }
@@ -441,7 +465,7 @@ function enterNavMode(stepId) {
   var navContainer = document.getElementById('navContainer');
   var phase = PH[pi];
 
-  /* Left panel */
+  /* === LEFT PANEL: task checklist === */
   var leftHtml = '<div class="nav-header">'
     + '<button class="nav-close-btn" id="navCloseBtn">&times;</button>'
     + '<div class="nav-step-info">'
@@ -454,15 +478,16 @@ function enterNavMode(stepId) {
   for (var t = 0; t < navInfo.nav.length; t++) {
     var ni = navInfo.nav[t];
     var checked = navSavedChecks[t];
+    var sm = getSiteMeta(ni.url);
     leftHtml += '<div class="nav-task' + (checked ? ' done' : '') + (t === firstUnchecked ? ' active' : '') + '" data-nav-ti="' + t + '">'
       + '<div class="nav-task-check" data-check-ti="' + t + '">'
       + '<div class="nav-tk">' + (checked ? '&#10003;' : (t + 1)) + '</div>'
       + '</div>'
       + '<div class="nav-task-body" data-goto-ti="' + t + '">'
-      + '<div class="nav-task-label">' + esc(ni.label) + '</div>'
+      + '<div class="nav-task-label">' + sm.icon + ' ' + esc(ni.label) + '</div>'
       + '<div class="nav-task-hint">' + esc(ni.hint) + '</div>'
-      + (ni.url ? '<div class="nav-task-url">\ud83c\udf10 ' + esc(ni.url.replace(/^https?:\/\//,'').substring(0,45)) + '</div>' : '<div class="nav-task-url local">\ud83d\udcbb \ub85c\uceec \uc791\uc5c5</div>')
       + '</div>'
+      + (ni.url ? '<button class="nav-open-btn" data-open-ti="' + t + '" title="\uc0c8 \ud0ed\uc73c\ub85c \uc5f4\uae30">\ud83d\ude80</button>' : '')
       + '</div>';
   }
 
@@ -479,108 +504,92 @@ function enterNavMode(stepId) {
 
   document.getElementById('navLeft').innerHTML = leftHtml;
 
-  /* Set iframe to first unchecked task */
-  navigateIframe(firstUnchecked, navInfo);
+  /* === RIGHT PANEL: current task detail guide === */
+  renderNavRight(firstUnchecked, navInfo, step, phase);
 
   /* Show navigator */
   navContainer.classList.add('on');
   document.getElementById('appShell').style.display = 'none';
-
-  /* Update progress */
   updateNavProgress(navInfo, navSavedChecks);
 
   /* === EVENT HANDLERS === */
-
   document.getElementById('navCloseBtn').addEventListener('click', exitNavMode);
-
   document.getElementById('navCompleteBtn').addEventListener('click', function() {
     completeStep(navStepId);
     exitNavMode();
   });
 
-  /* Prev/Next buttons */
   document.getElementById('navPrevBtn').addEventListener('click', function() {
-    if (navTaskIdx > 0) {
-      navTaskIdx--;
-      setActiveNavTask(navTaskIdx, navNavInfo, true);
-    }
+    if (navTaskIdx > 0) { navTaskIdx--; setActiveNavTask(navTaskIdx, navNavInfo, true); }
   });
   document.getElementById('navNextBtn').addEventListener('click', function() {
-    if (navTaskIdx < navNavInfo.nav.length - 1) {
-      navTaskIdx++;
-      setActiveNavTask(navTaskIdx, navNavInfo, true);
-    }
+    if (navTaskIdx < navNavInfo.nav.length - 1) { navTaskIdx++; setActiveNavTask(navTaskIdx, navNavInfo, true); }
   });
 
-  /* Task interaction — separated check vs navigate */
   var navTasks = document.getElementById('navTasks');
   navTasks.addEventListener('click', function(e) {
-    /* Check button area — toggle check ONLY */
+    /* Open button = new tab */
+    var openBtn = e.target.closest('[data-open-ti]');
+    if (openBtn) {
+      var oi = parseInt(openBtn.getAttribute('data-open-ti'));
+      if (!isNaN(oi)) openSiteTab(oi, navNavInfo);
+      return;
+    }
+    /* Check area = toggle check */
     var checkArea = e.target.closest('[data-check-ti]');
     if (checkArea) {
       var ci2 = parseInt(checkArea.getAttribute('data-check-ti'));
-      if (isNaN(ci2)) return;
-      toggleNavCheck(ci2);
+      if (!isNaN(ci2)) toggleNavCheck(ci2);
       return;
     }
-
-    /* Task body area — navigate iframe + set active */
+    /* Task body = select + show detail */
     var gotoArea = e.target.closest('[data-goto-ti]');
     if (gotoArea) {
       var gi = parseInt(gotoArea.getAttribute('data-goto-ti'));
-      if (isNaN(gi)) return;
-      navTaskIdx = gi;
-      setActiveNavTask(gi, navNavInfo, true);
+      if (!isNaN(gi)) { navTaskIdx = gi; setActiveNavTask(gi, navNavInfo, true); }
       return;
     }
+  });
+
+  /* Right panel events */
+  document.getElementById('navRight').addEventListener('click', function(e) {
+    var openMain = e.target.closest('#navOpenSiteBtn');
+    if (openMain) { openSiteTab(navTaskIdx, navNavInfo); return; }
+    var checkMain = e.target.closest('#navCheckCurBtn');
+    if (checkMain) { toggleNavCheck(navTaskIdx); return; }
   });
 
   /* Keyboard shortcuts */
   navKeyHandler = function(e) {
     if (!navActive) return;
     if (e.key === 'Escape') { exitNavMode(); return; }
-    /* Space = toggle check current task */
     if (e.key === ' ' && !e.target.closest('input,textarea,select')) {
-      e.preventDefault();
-      toggleNavCheck(navTaskIdx);
-      return;
+      e.preventDefault(); toggleNavCheck(navTaskIdx); return;
     }
-    /* Arrow Down / Right = next task */
     if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
       e.preventDefault();
-      if (navTaskIdx < navNavInfo.nav.length - 1) {
-        navTaskIdx++;
-        setActiveNavTask(navTaskIdx, navNavInfo, true);
-      }
+      if (navTaskIdx < navNavInfo.nav.length - 1) { navTaskIdx++; setActiveNavTask(navTaskIdx, navNavInfo, true); }
       return;
     }
-    /* Arrow Up / Left = prev task */
     if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
       e.preventDefault();
-      if (navTaskIdx > 0) {
-        navTaskIdx--;
-        setActiveNavTask(navTaskIdx, navNavInfo, true);
-      }
+      if (navTaskIdx > 0) { navTaskIdx--; setActiveNavTask(navTaskIdx, navNavInfo, true); }
       return;
     }
-    /* Enter = complete step if all done */
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !e.target.closest('input,textarea,select')) {
+      e.preventDefault();
+      /* Enter on current task = open site */
+      var ni = navNavInfo.nav[navTaskIdx];
+      if (ni && ni.url) { openSiteTab(navTaskIdx, navNavInfo); }
+      /* If all checked, complete step */
       var allChecked = true;
-      for (var k = 0; k < navNavInfo.nav.length; k++) {
-        if (!navSavedChecks[k]) { allChecked = false; break; }
-      }
-      if (allChecked) {
-        completeStep(navStepId);
-        exitNavMode();
-      }
+      for (var k = 0; k < navNavInfo.nav.length; k++) { if (!navSavedChecks[k]) { allChecked = false; break; } }
+      if (allChecked) { completeStep(navStepId); exitNavMode(); }
       return;
     }
-    /* Number keys 1-9 = jump to task */
     var num = parseInt(e.key);
     if (num >= 1 && num <= navNavInfo.nav.length) {
-      navTaskIdx = num - 1;
-      setActiveNavTask(navTaskIdx, navNavInfo, true);
-      return;
+      navTaskIdx = num - 1; setActiveNavTask(navTaskIdx, navNavInfo, true); return;
     }
   };
   document.addEventListener('keydown', navKeyHandler);
@@ -588,11 +597,81 @@ function enterNavMode(stepId) {
 
 var navKeyHandler = null;
 
+/* Open site in new tab */
+function openSiteTab(idx, navInfo) {
+  var ni = navInfo.nav[idx];
+  if (!ni || !ni.url) return;
+  var w = window.open(ni.url, '_blank');
+  navOpenedTabs[idx] = true;
+  /* Update the open button to show "opened" state */
+  var btn = document.querySelector('.nav-open-btn[data-open-ti="' + idx + '"]');
+  if (btn) { btn.classList.add('opened'); btn.textContent = '\u2705'; }
+  /* Update right panel */
+  renderNavRight(idx, navInfo);
+  showNavToast('\ud83d\ude80 ' + getSiteMeta(ni.url).name + ' \uc5f4\ub9bc');
+}
+
+/* Render right panel with current task detail */
+function renderNavRight(idx, navInfo, step, phase) {
+  var ni = navInfo.nav[idx];
+  var sm = getSiteMeta(ni ? ni.url : null);
+  var isLocal = !ni || !ni.url;
+  var isChecked = !!navSavedChecks[idx];
+  var wasOpened = !!navOpenedTabs[idx];
+
+  var html = '<div class="nr-inner">';
+
+  /* Current step indicator */
+  html += '<div class="nr-step-num">\ud56d\ubaa9 ' + (idx + 1) + ' / ' + navInfo.nav.length + '</div>';
+
+  /* Site card */
+  html += '<div class="nr-site-card">'
+    + '<div class="nr-site-icon" style="background:' + sm.color + '22;color:' + sm.color + ';font-size:2.4rem;">' + sm.icon + '</div>'
+    + '<div class="nr-site-name">' + esc(sm.name) + '</div>'
+    + '<div class="nr-task-title">' + esc(ni ? ni.label : '') + '</div>'
+    + '</div>';
+
+  /* Hint */
+  html += '<div class="nr-hint-box">'
+    + '<div class="nr-hint-label">\ud83d\udca1 \uc774\ubc88 \ud56d\ubaa9\uc5d0\uc11c \ud560 \uc77c</div>'
+    + '<div class="nr-hint-text">' + esc(ni ? ni.hint : '') + '</div>'
+    + '</div>';
+
+  /* Action buttons */
+  if (!isLocal) {
+    html += '<button class="nr-open-btn" id="navOpenSiteBtn">'
+      + (wasOpened ? '\ud83d\udd01 ' + esc(sm.name) + ' \ub2e4\uc2dc \uc5f4\uae30' : '\ud83d\ude80 ' + esc(sm.name) + ' \uc0c8 \ud0ed\uc73c\ub85c \uc5f4\uae30')
+      + '</button>'
+      + '<div class="nr-url-display">' + esc(ni.url) + '</div>';
+  } else {
+    html += '<div class="nr-local-box">'
+      + '<div class="nr-local-icon">\ud83d\udcbb</div>'
+      + '<div class="nr-local-txt">\ub85c\uceec\uc5d0\uc11c \uc9c1\uc811 \uc791\uc5c5\ud558\ub294 \ud56d\ubaa9\uc785\ub2c8\ub2e4<br><span>\uc544\ub798 \uccb4\ud06c \ubc84\ud2bc\uc73c\ub85c \uc644\ub8cc \ud45c\uc2dc\ud558\uc138\uc694</span></div>'
+      + '</div>';
+  }
+
+  /* Check / uncheck button */
+  html += '<button class="nr-check-btn' + (isChecked ? ' done' : '') + '" id="navCheckCurBtn">'
+    + (isChecked ? '\u21a9\ufe0f \uc644\ub8cc \ucde8\uc18c' : '\u2705 \uc644\ub8cc \uccb4\ud06c (Space)')
+    + '</button>';
+
+  /* Keyboard hint */
+  html += '<div class="nr-keys">'
+    + '<span class="nr-key">Space</span> \uccb4\ud06c &nbsp; '
+    + '<span class="nr-key">\u2190 \u2192</span> \uc774\ub3d9 &nbsp; '
+    + '<span class="nr-key">Enter</span> \uc5f4\uae30 &nbsp; '
+    + '<span class="nr-key">Esc</span> \ub2eb\uae30 &nbsp; '
+    + '<span class="nr-key">1-9</span> \uc810\ud504'
+    + '</div>';
+
+  html += '</div>';
+  document.getElementById('navRight').innerHTML = html;
+}
+
 function toggleNavCheck(ti) {
   navSavedChecks[ti] = !navSavedChecks[ti];
   localStorage.setItem(SK + '_tc_' + navStepId, JSON.stringify(navSavedChecks));
 
-  /* Instant DOM update — no re-render */
   var taskEl = document.querySelector('.nav-task[data-nav-ti="' + ti + '"]');
   if (taskEl) {
     var tkEl = taskEl.querySelector('.nav-tk');
@@ -608,8 +687,9 @@ function toggleNavCheck(ti) {
   }
 
   updateNavProgress(navNavInfo, navSavedChecks);
+  /* Update right panel check button */
+  renderNavRight(navTaskIdx, navNavInfo);
 
-  /* If checking, auto-advance to next unchecked + navigate iframe */
   if (navSavedChecks[ti]) {
     var nextIdx = -1;
     for (var n = 0; n < navNavInfo.nav.length; n++) {
@@ -617,12 +697,8 @@ function toggleNavCheck(ti) {
     }
     if (nextIdx >= 0) {
       navTaskIdx = nextIdx;
-      /* Small delay for visual feedback before advancing */
-      setTimeout(function() {
-        setActiveNavTask(nextIdx, navNavInfo, true);
-      }, 250);
+      setTimeout(function() { setActiveNavTask(nextIdx, navNavInfo, true); }, 250);
     }
-    /* If all checked, show completion glow */
     if (nextIdx < 0) {
       showNavToast('\ud83c\udf89 \ubaa8\ub4e0 \ud56d\ubaa9 \uc644\ub8cc! Enter\ub85c \ub2e8\uacc4 \uc644\ub8cc');
     }
@@ -631,44 +707,19 @@ function toggleNavCheck(ti) {
 
 function setActiveNavTask(idx, navInfo, navigate) {
   var tasks = document.querySelectorAll('#navTasks .nav-task');
-  for (var i = 0; i < tasks.length; i++) {
-    tasks[i].classList.remove('active');
-  }
+  for (var i = 0; i < tasks.length; i++) { tasks[i].classList.remove('active'); }
   if (tasks[idx]) {
     tasks[idx].classList.add('active');
     tasks[idx].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
-  /* Update prev/next button states */
   var prevBtn = document.getElementById('navPrevBtn');
   var nextBtn = document.getElementById('navNextBtn');
   if (prevBtn) prevBtn.disabled = (idx === 0);
   if (nextBtn) nextBtn.disabled = (idx >= navInfo.nav.length - 1);
 
   if (navigate) {
-    navigateIframe(idx, navInfo);
-  }
-}
-
-function navigateIframe(idx, navInfo) {
-  var ni = navInfo.nav[idx];
-  var iframe = document.getElementById('navIframe');
-  var placeholder = document.getElementById('navPlaceholder');
-  if (ni && ni.url) {
-    /* Only reload if URL actually changed */
-    var newSrc = ni.url;
-    if (iframe.src !== newSrc && iframe.getAttribute('data-last-url') !== newSrc) {
-      iframe.setAttribute('data-last-url', newSrc);
-      iframe.src = newSrc;
-    }
-    iframe.style.display = 'block';
-    placeholder.style.display = 'none';
-  } else {
-    iframe.style.display = 'none';
-    iframe.src = 'about:blank';
-    iframe.setAttribute('data-last-url', '');
-    placeholder.style.display = 'flex';
-    placeholder.innerHTML = '<div class="nav-ph-icon">\ud83d\udcbb</div><div class="nav-ph-txt">\uc774 \ub2e8\uacc4\ub294 \ub85c\uceec \uc791\uc5c5\uc785\ub2c8\ub2e4<br><span>\uc88c\uce21 \uac00\uc774\ub4dc\ub97c \ub530\ub77c \uc9c4\ud589\ud558\uc138\uc694</span></div>';
+    renderNavRight(idx, navInfo);
   }
 }
 
@@ -703,18 +754,15 @@ function showNavToast(msg) {
 function exitNavMode() {
   navActive = false;
   navNavInfo = null;
+  navOpenedTabs = {};
   var navContainer = document.getElementById('navContainer');
   navContainer.classList.remove('on');
   document.getElementById('appShell').style.display = '';
   document.getElementById('appShell').classList.add('on');
-  var iframe = document.getElementById('navIframe');
-  iframe.src = 'about:blank';
-  iframe.setAttribute('data-last-url', '');
   if (navKeyHandler) {
     document.removeEventListener('keydown', navKeyHandler);
     navKeyHandler = null;
   }
-  /* Refresh views */
   if (curPhId) showPhaseView(curPhId);
   else showWelcome();
   renderSidebar();
@@ -990,7 +1038,7 @@ function openModal(stepId) {
     html += '<div class="m-sec"><div class="m-nav-launch" id="mNavLaunch" data-nav-step="' + stepId + '">'
       + '<div class="m-nav-launch-icon">\ud83d\ude80</div>'
       + '<div class="m-nav-launch-txt"><b>\uc2e4\uc2b5 \ub124\ube44\uac8c\uc774\ud130\ub85c \uc2dc\uc791\ud558\uae30</b><br>'
-      + '<span>\uc88c\uce21 \uac00\uc774\ub4dc + \uc6b0\uce21 \uc0ac\uc774\ud2b8 iframe \xb7 ' + navCount + '\uac1c \ud56d\ubaa9 \xb7 \ud0a4\ubcf4\ub4dc \uc9c0\uc6d0</span></div></div></div>';
+      + '<span>\uac00\uc774\ub4dc \ud328\ub110 + \uc0c8 \ud0ed \uc5f4\uae30 \xb7 ' + navCount + '\uac1c \ud56d\ubaa9 \xb7 \ud0a4\ubcf4\ub4dc \uc9c0\uc6d0</span></div></div></div>';
   }
 
   if (step.links && step.links.length) {
