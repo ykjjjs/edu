@@ -1,10 +1,24 @@
 /* ═══════════════════════════════════════════════════════
-   STELLAR EDU v8.2 — Open Tab Navigator Edition
-   새 탭 열기 + 우측 상세 가이드 + 즉시 체크 + 키보드 지원
-   외부 사이트 iframe 차단 우회: window.open() 방식
+   WebDo v9.0 — Real Google Auth + Supabase DB
+   진짜 Google OAuth 로그인 + 서버 진행도 저장
+   수강생 관리: Supabase 대시보드에서 실시간 조회
+   Copyright 2026. WebDo (Yeon Je-jin) All rights reserved.
    ═══════════════════════════════════════════════════════ */
 (function() {
 'use strict';
+
+/* ─── SUPABASE CLIENT ─────────────────────────── */
+var SUPABASE_URL = 'https://qsqeotkoifwhdpzfdpmf.supabase.co';
+var SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFzcWVvdGtvaWZ3aGRwemZkcG1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ1MDk4NTUsImV4cCI6MjA5MDA4NTg1NX0.lcuolb0NvVpc312t2oewwjyvu1WfHaoug6ihfGRaVjo';
+var sb = null;
+var sbReady = false;
+
+function initSupabase() {
+  if (window.supabase && window.supabase.createClient) {
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+    sbReady = true;
+  }
+}
 
 /* ─── ADVANCED STARFIELD + SHOOTING STARS ────── */
 var canvas = document.getElementById('starfield');
@@ -136,14 +150,16 @@ function loadData(callback) {
 }
 
 /* ─── STATE ──────────────────────────────────── */
-var SK = 'stellar_edu_v8';
+var SK = 'webdo_v9';
 var st = {};
 var pts = [];
 var curUser = null;
+var curUserMeta = null;
 var curPhId = null;
 var curStep = null;
 var tSt = {};
 var sbClosed = {};
+var syncTimer = null;
 
 function loadSt() {
   try { st = JSON.parse(localStorage.getItem(SK + '_s') || '{}'); } catch(e) { st = {}; }
@@ -152,6 +168,7 @@ function loadSt() {
 function saveSt() {
   localStorage.setItem(SK + '_s', JSON.stringify(st));
   localStorage.setItem(SK + '_p', JSON.stringify(pts));
+  debounceSyncToServer();
 }
 function isDone(id) { return !!st[id]; }
 function setDone(id, v) { st[id] = v; saveSt(); }
@@ -176,31 +193,147 @@ function esc(s) {
   return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-/* ─── AUTH ────────────────────────────────────── */
+/* ─── SUPABASE SYNC (서버 저장) ─────────────── */
+function debounceSyncToServer() {
+  if (syncTimer) clearTimeout(syncTimer);
+  syncTimer = setTimeout(function() { syncProgressToServer(); }, 2000);
+}
+
+function syncProgressToServer() {
+  if (!sbReady || !sb || !curUser) return;
+  sb.auth.getUser().then(function(res) {
+    if (!res.data || !res.data.user) return;
+    var userId = res.data.user.id;
+    var payload = {
+      user_id: userId,
+      progress_data: JSON.stringify(st),
+      nav_checks: JSON.stringify(getAllNavChecks()),
+      patients_data: JSON.stringify(pts),
+      updated_at: new Date().toISOString()
+    };
+    sb.from('user_progress').upsert(payload, { onConflict: 'user_id' })
+      .then(function() { /* silent */ })
+      .catch(function() { /* fallback: localStorage already saved */ });
+  });
+}
+
+function loadProgressFromServer() {
+  if (!sbReady || !sb || !curUser) return Promise.resolve();
+  return sb.auth.getUser().then(function(res) {
+    if (!res.data || !res.data.user) return;
+    var userId = res.data.user.id;
+    return sb.from('user_progress').select('*').eq('user_id', userId).single()
+      .then(function(resp) {
+        if (resp.data) {
+          try { st = JSON.parse(resp.data.progress_data || '{}'); } catch(e) {}
+          try { pts = JSON.parse(resp.data.patients_data || '[]'); } catch(e) {}
+          try {
+            var navChecks = JSON.parse(resp.data.nav_checks || '{}');
+            restoreAllNavChecks(navChecks);
+          } catch(e) {}
+          localStorage.setItem(SK + '_s', JSON.stringify(st));
+          localStorage.setItem(SK + '_p', JSON.stringify(pts));
+        }
+      }).catch(function() { /* No server data yet, use localStorage */ });
+  });
+}
+
+function getAllNavChecks() {
+  var all = {};
+  for (var key in NAV_DATA) {
+    try { var c = JSON.parse(localStorage.getItem(SK + '_tc_' + key) || '{}'); if (Object.keys(c).length) all[key] = c; } catch(e) {}
+  }
+  return all;
+}
+
+function restoreAllNavChecks(obj) {
+  if (!obj) return;
+  for (var key in obj) {
+    localStorage.setItem(SK + '_tc_' + key, JSON.stringify(obj[key]));
+  }
+}
+
+/* ─── AUTH (Real Supabase Google OAuth) ─────── */
 document.getElementById('gBtn').addEventListener('click', function() {
-  var e = prompt('\uad6c\uae00 \uc774\uba54\uc77c \uc785\ub825 (\ub370\ubaa8):', 'user@gmail.com');
-  if (e) launch(e);
+  if (!sbReady) {
+    showLoginError('Supabase SDK 로딩 중입니다. 잠시 후 다시 시도해주세요.');
+    return;
+  }
+  document.getElementById('gBtn').disabled = true;
+  document.getElementById('gBtn').textContent = '로그인 중...';
+  sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: {
+      redirectTo: window.location.origin
+    }
+  }).then(function(res) {
+    if (res.error) {
+      showLoginError('로그인 실패: ' + res.error.message);
+      document.getElementById('gBtn').disabled = false;
+      document.getElementById('gBtn').innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg> Google 계정으로 시작하기';
+    }
+    /* OAuth redirect happens automatically */
+  });
 });
-document.getElementById('demoBtn').addEventListener('click', function() {
-  launch('demo@stellar.edu');
-});
+
 document.getElementById('logoutBtn').addEventListener('click', function() {
+  if (sbReady && sb) {
+    sb.auth.signOut().then(function() {
+      doLogout();
+    });
+  } else {
+    doLogout();
+  }
+});
+
+function doLogout() {
   localStorage.removeItem(SK + '_user');
   curUser = null;
+  curUserMeta = null;
   document.getElementById('appShell').classList.remove('on');
   document.getElementById('loginScreen').style.display = 'flex';
   exitNavMode();
-});
+}
 
-function launch(email) {
-  curUser = email;
-  localStorage.setItem(SK + '_user', email);
+function showLoginError(msg) {
+  var el = document.getElementById('loginError');
+  if (el) { el.textContent = msg; el.style.display = 'block'; }
+}
+
+function launch(user) {
+  curUser = user.email || user.user_metadata && user.user_metadata.email || 'unknown';
+  curUserMeta = user.user_metadata || {};
+  var displayName = curUserMeta.full_name || curUserMeta.name || curUser;
+  var avatar = curUserMeta.avatar_url || curUserMeta.picture || '';
+
+  localStorage.setItem(SK + '_user', curUser);
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('appShell').classList.add('on');
-  document.getElementById('userAv').textContent = email[0].toUpperCase();
-  renderSidebar();
-  updateTopPct();
-  showWelcome();
+
+  /* Avatar */
+  var avImg = document.getElementById('userAvImg');
+  var avText = document.getElementById('userAv');
+  if (avatar) {
+    avImg.src = avatar;
+    avImg.style.display = 'block';
+    avText.style.display = 'none';
+  } else {
+    avText.textContent = curUser[0].toUpperCase();
+    avImg.style.display = 'none';
+    avText.style.display = 'flex';
+  }
+  document.getElementById('userName').textContent = displayName;
+
+  /* Load progress from server, then render */
+  loadProgressFromServer().then(function() {
+    renderSidebar();
+    updateTopPct();
+    showWelcome();
+  }).catch(function() {
+    renderSidebar();
+    updateTopPct();
+    showWelcome();
+  });
 }
 
 /* ─── SIDEBAR ────────────────────────────────── */
@@ -275,10 +408,11 @@ function showWelcome() {
   curPhId = null;
   var done = totalDone(), total = allSteps().length;
   var pct = total ? Math.round(done / total * 100) : 0;
+  var displayName = (curUserMeta && (curUserMeta.full_name || curUserMeta.name)) || curUser || '';
 
   var html = '<div class="welcome-hero"><div class="wh-inner">'
-    + '<div class="wh-hi">\uc548\ub155\ud558\uc138\uc694, ' + esc(curUser) + ' \ud83d\udc4b</div>'
-    + '<div class="wh-title">STELLAR <span>EDU</span></div>'
+    + '<div class="wh-hi">\uc548\ub155\ud558\uc138\uc694, ' + esc(displayName) + ' \ud83d\udc4b</div>'
+    + '<div class="wh-title">Web<span>Do</span></div>'
     + '<div class="wh-sub">HTML \ud504\ub85c\ud1a0\ud0c0\uc785 \ud55c \uc7a5\uc5d0\uc11c \uc2dc\uc791\ud574\uc11c Google \ub85c\uadf8\uc778 \xb7 Supabase DB \xb7 Telegram \uc54c\ub9bc\uae4c\uc9c0<br>\uc11c\ubc84\ube44 0\uc6d0\uc73c\ub85c \uc644\uc131\ud558\ub294 \uc804\uccb4 \uacf5\uc815\uc744 \ub2e8\uacc4\ubcc4\ub85c \uc2e4\uc2b5\ud569\ub2c8\ub2e4.</div>'
     + '<div class="wh-stats">'
     + '<div class="wstat"><div class="wstat-num">' + pct + '%</div><div class="wstat-lbl">\uc804\uccb4 \ub2ec\uc131\ub960</div></div>'
@@ -348,7 +482,6 @@ function showPhaseView(phId) {
     if (e.target.closest('#backBtn')) { showWelcome(); return; }
     var stepEl = e.target.closest('[data-step-id]');
     if (stepEl && !e.target.closest('.sc-nav-btn')) { e.stopPropagation(); openModal(stepEl.getAttribute('data-step-id')); return; }
-    /* Nav mode launch button */
     var navBtn = e.target.closest('[data-nav-step]');
     if (navBtn) { e.stopPropagation(); enterNavMode(navBtn.getAttribute('data-nav-step')); return; }
     if (e.target.closest('#ptAddBtn')) { openPatientForm(); return; }
@@ -397,8 +530,6 @@ function renderStepCard(s, pi, si) {
 
 /* ═════════════════════════════════════════════════
    NAVIGATOR MODE v3 — Open Tab Edition
-   좌측: 체크리스트 + 우측: 현재 항목 상세 가이드
-   클릭하면 새 탭으로 사이트 열기 (iframe 차단 우회)
    ═════════════════════════════════════════════════ */
 var navActive = false;
 var navStepId = null;
@@ -407,7 +538,6 @@ var navSavedChecks = {};
 var navNavInfo = null;
 var navOpenedTabs = {};
 
-/* 도메인별 파비콘 + 색상 매핑 */
 var SITE_META = {
   'accounts.google.com': { icon: '\ud83d\udd11', color: '#4285F4', name: 'Google' },
   'supabase.com':        { icon: '\ud83d\udfe2', color: '#3ECF8E', name: 'Supabase' },
@@ -433,10 +563,7 @@ function getSiteMeta(url) {
 
 function enterNavMode(stepId) {
   var navInfo = NAV_DATA[stepId];
-  if (!navInfo || !navInfo.nav || navInfo.nav.length === 0) {
-    openModal(stepId);
-    return;
-  }
+  if (!navInfo || !navInfo.nav || navInfo.nav.length === 0) { openModal(stepId); return; }
 
   var step = null, pi = -1, si = -1;
   for (var i = 0; i < PH.length; i++) {
@@ -465,7 +592,6 @@ function enterNavMode(stepId) {
   var navContainer = document.getElementById('navContainer');
   var phase = PH[pi];
 
-  /* === LEFT PANEL: task checklist === */
   var leftHtml = '<div class="nav-header">'
     + '<button class="nav-close-btn" id="navCloseBtn">&times;</button>'
     + '<div class="nav-step-info">'
@@ -503,22 +629,17 @@ function enterNavMode(stepId) {
     + '</div>';
 
   document.getElementById('navLeft').innerHTML = leftHtml;
-
-  /* === RIGHT PANEL: current task detail guide === */
   renderNavRight(firstUnchecked, navInfo, step, phase);
 
-  /* Show navigator */
   navContainer.classList.add('on');
   document.getElementById('appShell').style.display = 'none';
   updateNavProgress(navInfo, navSavedChecks);
 
-  /* === EVENT HANDLERS === */
   document.getElementById('navCloseBtn').addEventListener('click', exitNavMode);
   document.getElementById('navCompleteBtn').addEventListener('click', function() {
     completeStep(navStepId);
     exitNavMode();
   });
-
   document.getElementById('navPrevBtn').addEventListener('click', function() {
     if (navTaskIdx > 0) { navTaskIdx--; setActiveNavTask(navTaskIdx, navNavInfo, true); }
   });
@@ -528,30 +649,14 @@ function enterNavMode(stepId) {
 
   var navTasks = document.getElementById('navTasks');
   navTasks.addEventListener('click', function(e) {
-    /* Open button = new tab */
     var openBtn = e.target.closest('[data-open-ti]');
-    if (openBtn) {
-      var oi = parseInt(openBtn.getAttribute('data-open-ti'));
-      if (!isNaN(oi)) openSiteTab(oi, navNavInfo);
-      return;
-    }
-    /* Check area = toggle check */
+    if (openBtn) { var oi = parseInt(openBtn.getAttribute('data-open-ti')); if (!isNaN(oi)) openSiteTab(oi, navNavInfo); return; }
     var checkArea = e.target.closest('[data-check-ti]');
-    if (checkArea) {
-      var ci2 = parseInt(checkArea.getAttribute('data-check-ti'));
-      if (!isNaN(ci2)) toggleNavCheck(ci2);
-      return;
-    }
-    /* Task body = select + show detail */
+    if (checkArea) { var ci2 = parseInt(checkArea.getAttribute('data-check-ti')); if (!isNaN(ci2)) toggleNavCheck(ci2); return; }
     var gotoArea = e.target.closest('[data-goto-ti]');
-    if (gotoArea) {
-      var gi = parseInt(gotoArea.getAttribute('data-goto-ti'));
-      if (!isNaN(gi)) { navTaskIdx = gi; setActiveNavTask(gi, navNavInfo, true); }
-      return;
-    }
+    if (gotoArea) { var gi = parseInt(gotoArea.getAttribute('data-goto-ti')); if (!isNaN(gi)) { navTaskIdx = gi; setActiveNavTask(gi, navNavInfo, true); } return; }
   });
 
-  /* Right panel events */
   document.getElementById('navRight').addEventListener('click', function(e) {
     var openMain = e.target.closest('#navOpenSiteBtn');
     if (openMain) { openSiteTab(navTaskIdx, navNavInfo); return; }
@@ -559,60 +664,41 @@ function enterNavMode(stepId) {
     if (checkMain) { toggleNavCheck(navTaskIdx); return; }
   });
 
-  /* Keyboard shortcuts */
   navKeyHandler = function(e) {
     if (!navActive) return;
     if (e.key === 'Escape') { exitNavMode(); return; }
-    if (e.key === ' ' && !e.target.closest('input,textarea,select')) {
-      e.preventDefault(); toggleNavCheck(navTaskIdx); return;
-    }
-    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
-      e.preventDefault();
-      if (navTaskIdx < navNavInfo.nav.length - 1) { navTaskIdx++; setActiveNavTask(navTaskIdx, navNavInfo, true); }
-      return;
-    }
-    if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
-      e.preventDefault();
-      if (navTaskIdx > 0) { navTaskIdx--; setActiveNavTask(navTaskIdx, navNavInfo, true); }
-      return;
-    }
+    if (e.key === ' ' && !e.target.closest('input,textarea,select')) { e.preventDefault(); toggleNavCheck(navTaskIdx); return; }
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { e.preventDefault(); if (navTaskIdx < navNavInfo.nav.length - 1) { navTaskIdx++; setActiveNavTask(navTaskIdx, navNavInfo, true); } return; }
+    if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { e.preventDefault(); if (navTaskIdx > 0) { navTaskIdx--; setActiveNavTask(navTaskIdx, navNavInfo, true); } return; }
     if (e.key === 'Enter' && !e.target.closest('input,textarea,select')) {
       e.preventDefault();
-      /* Enter on current task = open site */
-      var ni = navNavInfo.nav[navTaskIdx];
-      if (ni && ni.url) { openSiteTab(navTaskIdx, navNavInfo); }
-      /* If all checked, complete step */
+      var ni2 = navNavInfo.nav[navTaskIdx];
+      if (ni2 && ni2.url) { openSiteTab(navTaskIdx, navNavInfo); }
       var allChecked = true;
       for (var k = 0; k < navNavInfo.nav.length; k++) { if (!navSavedChecks[k]) { allChecked = false; break; } }
       if (allChecked) { completeStep(navStepId); exitNavMode(); }
       return;
     }
     var num = parseInt(e.key);
-    if (num >= 1 && num <= navNavInfo.nav.length) {
-      navTaskIdx = num - 1; setActiveNavTask(navTaskIdx, navNavInfo, true); return;
-    }
+    if (num >= 1 && num <= navNavInfo.nav.length) { navTaskIdx = num - 1; setActiveNavTask(navTaskIdx, navNavInfo, true); return; }
   };
   document.addEventListener('keydown', navKeyHandler);
 }
 
 var navKeyHandler = null;
 
-/* Open site in new tab */
 function openSiteTab(idx, navInfo) {
   var ni = navInfo.nav[idx];
   if (!ni || !ni.url) return;
-  var w = window.open(ni.url, '_blank');
+  window.open(ni.url, '_blank');
   navOpenedTabs[idx] = true;
-  /* Update the open button to show "opened" state */
   var btn = document.querySelector('.nav-open-btn[data-open-ti="' + idx + '"]');
   if (btn) { btn.classList.add('opened'); btn.textContent = '\u2705'; }
-  /* Update right panel */
   renderNavRight(idx, navInfo);
   showNavToast('\ud83d\ude80 ' + getSiteMeta(ni.url).name + ' \uc5f4\ub9bc');
 }
 
-/* Render right panel with current task detail */
-function renderNavRight(idx, navInfo, step, phase) {
+function renderNavRight(idx, navInfo) {
   var ni = navInfo.nav[idx];
   var sm = getSiteMeta(ni ? ni.url : null);
   var isLocal = !ni || !ni.url;
@@ -620,24 +706,17 @@ function renderNavRight(idx, navInfo, step, phase) {
   var wasOpened = !!navOpenedTabs[idx];
 
   var html = '<div class="nr-inner">';
-
-  /* Current step indicator */
   html += '<div class="nr-step-num">\ud56d\ubaa9 ' + (idx + 1) + ' / ' + navInfo.nav.length + '</div>';
-
-  /* Site card */
   html += '<div class="nr-site-card">'
     + '<div class="nr-site-icon" style="background:' + sm.color + '22;color:' + sm.color + ';font-size:2.4rem;">' + sm.icon + '</div>'
     + '<div class="nr-site-name">' + esc(sm.name) + '</div>'
     + '<div class="nr-task-title">' + esc(ni ? ni.label : '') + '</div>'
     + '</div>';
-
-  /* Hint */
   html += '<div class="nr-hint-box">'
     + '<div class="nr-hint-label">\ud83d\udca1 \uc774\ubc88 \ud56d\ubaa9\uc5d0\uc11c \ud560 \uc77c</div>'
     + '<div class="nr-hint-text">' + esc(ni ? ni.hint : '') + '</div>'
     + '</div>';
 
-  /* Action buttons */
   if (!isLocal) {
     html += '<button class="nr-open-btn" id="navOpenSiteBtn">'
       + (wasOpened ? '\ud83d\udd01 ' + esc(sm.name) + ' \ub2e4\uc2dc \uc5f4\uae30' : '\ud83d\ude80 ' + esc(sm.name) + ' \uc0c8 \ud0ed\uc73c\ub85c \uc5f4\uae30')
@@ -650,12 +729,9 @@ function renderNavRight(idx, navInfo, step, phase) {
       + '</div>';
   }
 
-  /* Check / uncheck button */
   html += '<button class="nr-check-btn' + (isChecked ? ' done' : '') + '" id="navCheckCurBtn">'
     + (isChecked ? '\u21a9\ufe0f \uc644\ub8cc \ucde8\uc18c' : '\u2705 \uc644\ub8cc \uccb4\ud06c (Space)')
     + '</button>';
-
-  /* Keyboard hint */
   html += '<div class="nr-keys">'
     + '<span class="nr-key">Space</span> \uccb4\ud06c &nbsp; '
     + '<span class="nr-key">\u2190 \u2192</span> \uc774\ub3d9 &nbsp; '
@@ -663,7 +739,6 @@ function renderNavRight(idx, navInfo, step, phase) {
     + '<span class="nr-key">Esc</span> \ub2eb\uae30 &nbsp; '
     + '<span class="nr-key">1-9</span> \uc810\ud504'
     + '</div>';
-
   html += '</div>';
   document.getElementById('navRight').innerHTML = html;
 }
@@ -671,13 +746,13 @@ function renderNavRight(idx, navInfo, step, phase) {
 function toggleNavCheck(ti) {
   navSavedChecks[ti] = !navSavedChecks[ti];
   localStorage.setItem(SK + '_tc_' + navStepId, JSON.stringify(navSavedChecks));
+  debounceSyncToServer();
 
   var taskEl = document.querySelector('.nav-task[data-nav-ti="' + ti + '"]');
   if (taskEl) {
     var tkEl = taskEl.querySelector('.nav-tk');
     if (navSavedChecks[ti]) {
-      taskEl.classList.add('done');
-      taskEl.classList.add('check-flash');
+      taskEl.classList.add('done'); taskEl.classList.add('check-flash');
       if (tkEl) tkEl.innerHTML = '&#10003;';
       setTimeout(function() { taskEl.classList.remove('check-flash'); }, 400);
     } else {
@@ -687,40 +762,25 @@ function toggleNavCheck(ti) {
   }
 
   updateNavProgress(navNavInfo, navSavedChecks);
-  /* Update right panel check button */
   renderNavRight(navTaskIdx, navNavInfo);
 
   if (navSavedChecks[ti]) {
     var nextIdx = -1;
-    for (var n = 0; n < navNavInfo.nav.length; n++) {
-      if (!navSavedChecks[n]) { nextIdx = n; break; }
-    }
-    if (nextIdx >= 0) {
-      navTaskIdx = nextIdx;
-      setTimeout(function() { setActiveNavTask(nextIdx, navNavInfo, true); }, 250);
-    }
-    if (nextIdx < 0) {
-      showNavToast('\ud83c\udf89 \ubaa8\ub4e0 \ud56d\ubaa9 \uc644\ub8cc! Enter\ub85c \ub2e8\uacc4 \uc644\ub8cc');
-    }
+    for (var n = 0; n < navNavInfo.nav.length; n++) { if (!navSavedChecks[n]) { nextIdx = n; break; } }
+    if (nextIdx >= 0) { navTaskIdx = nextIdx; setTimeout(function() { setActiveNavTask(nextIdx, navNavInfo, true); }, 250); }
+    if (nextIdx < 0) { showNavToast('\ud83c\udf89 \ubaa8\ub4e0 \ud56d\ubaa9 \uc644\ub8cc! Enter\ub85c \ub2e8\uacc4 \uc644\ub8cc'); }
   }
 }
 
 function setActiveNavTask(idx, navInfo, navigate) {
   var tasks = document.querySelectorAll('#navTasks .nav-task');
   for (var i = 0; i < tasks.length; i++) { tasks[i].classList.remove('active'); }
-  if (tasks[idx]) {
-    tasks[idx].classList.add('active');
-    tasks[idx].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-  }
-
+  if (tasks[idx]) { tasks[idx].classList.add('active'); tasks[idx].scrollIntoView({ behavior: 'smooth', block: 'nearest' }); }
   var prevBtn = document.getElementById('navPrevBtn');
   var nextBtn = document.getElementById('navNextBtn');
   if (prevBtn) prevBtn.disabled = (idx === 0);
   if (nextBtn) nextBtn.disabled = (idx >= navInfo.nav.length - 1);
-
-  if (navigate) {
-    renderNavRight(idx, navInfo);
-  }
+  if (navigate) renderNavRight(idx, navInfo);
 }
 
 function updateNavProgress(navInfo, checks) {
@@ -734,13 +794,8 @@ function updateNavProgress(navInfo, checks) {
   if (fill) fill.style.width = pct + '%';
   var btn = document.getElementById('navCompleteBtn');
   if (btn) {
-    if (done >= total) {
-      btn.classList.add('ready');
-      btn.textContent = '\u2705 \ub2e8\uacc4 \uc804\uccb4 \uc644\ub8cc (Enter)';
-    } else {
-      btn.classList.remove('ready');
-      btn.textContent = '\u2705 \ub2e8\uacc4 \uc804\uccb4 \uc644\ub8cc';
-    }
+    if (done >= total) { btn.classList.add('ready'); btn.textContent = '\u2705 \ub2e8\uacc4 \uc804\uccb4 \uc644\ub8cc (Enter)'; }
+    else { btn.classList.remove('ready'); btn.textContent = '\u2705 \ub2e8\uacc4 \uc804\uccb4 \uc644\ub8cc'; }
   }
 }
 
@@ -759,10 +814,7 @@ function exitNavMode() {
   navContainer.classList.remove('on');
   document.getElementById('appShell').style.display = '';
   document.getElementById('appShell').classList.add('on');
-  if (navKeyHandler) {
-    document.removeEventListener('keydown', navKeyHandler);
-    navKeyHandler = null;
-  }
+  if (navKeyHandler) { document.removeEventListener('keydown', navKeyHandler); navKeyHandler = null; }
   if (curPhId) showPhaseView(curPhId);
   else showWelcome();
   renderSidebar();
@@ -773,10 +825,7 @@ function exitNavMode() {
 function buildPatientSection() {
   var rows = '';
   if (pts.length === 0) {
-    rows = '<tr><td colspan="8"><div class="pt-empty">'
-      + '<div class="pt-empty-icon">\ud83d\ude80</div>'
-      + '<div class="pt-empty-txt">[+ \ud658\uc790 \ucd94\uac00] \ub610\ub294 [\uc0d8\ud50c 5\uba85 \ucd94\uac00] \ubc84\ud2bc\uc73c\ub85c \uac00\uc0c1 \ub370\uc774\ud130\ub97c \ucd94\uac00\ud558\uc138\uc694.</div>'
-      + '</div></td></tr>';
+    rows = '<tr><td colspan="8"><div class="pt-empty"><div class="pt-empty-icon">\ud83d\ude80</div><div class="pt-empty-txt">[+ \ud658\uc790 \ucd94\uac00] \ub610\ub294 [\uc0d8\ud50c 5\uba85 \ucd94\uac00] \ubc84\ud2bc\uc73c\ub85c \uac00\uc0c1 \ub370\uc774\ud130\ub97c \ucd94\uac00\ud558\uc138\uc694.</div></div></td></tr>';
   } else {
     for (var i = 0; i < pts.length; i++) {
       var p = pts[i];
@@ -810,7 +859,6 @@ function buildPatientSection() {
     + '</div></div>';
 }
 
-/* ─── PATIENT FORM ───────────────────────────── */
 function openPatientForm() {
   var body = '<div class="pf-grid">'
     + '<div class="pf-field"><label class="pf-lbl">\uc774\ub984 *</label><input class="pf-inp" id="pf_name" placeholder="\ud64d\uae38\ub3d9"></div>'
@@ -821,9 +869,7 @@ function openPatientForm() {
     + '<div class="pf-field"><label class="pf-lbl">\uc804\ud654\ubc88\ud638 \ud83d\udd10</label><input class="pf-inp" id="pf_phone" placeholder="010-1234-5678"></div>'
     + '<div class="pf-enc-note pf-full">\ud83d\udd10 \uc0dd\ub144\uc6d4\uc77c\uacfc \uc804\ud654\ubc88\ud638\ub294 AES-256-GCM\uc73c\ub85c \uc790\ub3d9 \uc554\ud638\ud654\ub418\uc5b4 \uc800\uc7a5\ub429\ub2c8\ub2e4.</div>'
     + '</div>';
-  openGenericModal('\ud83c\udfe5', '\uc0c8 \ud658\uc790 \ucd94\uac00', '\ud658\uc790 \ub370\uc774\ud130 \uad00\ub9ac', body, '\ud83d\udcbe \uc800\uc7a5 & \uc554\ud638\ud654', function() {
-    savePatient();
-  });
+  openGenericModal('\ud83c\udfe5', '\uc0c8 \ud658\uc790 \ucd94\uac00', '\ud658\uc790 \ub370\uc774\ud130 \uad00\ub9ac', body, '\ud83d\udcbe \uc800\uc7a5 & \uc554\ud638\ud654', function() { savePatient(); });
 }
 
 function savePatient() {
@@ -837,10 +883,7 @@ function savePatient() {
   var uid = 'pt_' + Date.now() + '_' + Math.random().toString(36).substring(2, 8);
   encryptData(birth || '', 'hospitalKey2024!').then(function(be) {
     encryptData(phone || '', 'hospitalKey2024!').then(function(pe) {
-      pts.push({
-        id: uid, name: name, gender: gen, dept: dept, status: st2,
-        birth_enc: be, phone_enc: pe, created_at: new Date().toISOString()
-      });
+      pts.push({ id: uid, name: name, gender: gen, dept: dept, status: st2, birth_enc: be, phone_enc: pe, created_at: new Date().toISOString() });
       saveSt(); closeModal(); showPhaseView('p4');
       showToast('\u2705 \ud658\uc790 \ucd94\uac00 & \uc554\ud638\ud654 \uc644\ub8cc!');
     });
@@ -858,11 +901,7 @@ function loadSamples() {
   var proms = samples.map(function(s) {
     return encryptData(s.birth, 'hospitalKey2024!').then(function(be) {
       return encryptData(s.phone, 'hospitalKey2024!').then(function(pe) {
-        return {
-          id: 'pt_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
-          name: s.name, gender: s.gender, dept: s.dept, status: s.status,
-          birth_enc: be, phone_enc: pe, created_at: new Date().toISOString()
-        };
+        return { id: 'pt_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6), name: s.name, gender: s.gender, dept: s.dept, status: s.status, birth_enc: be, phone_enc: pe, created_at: new Date().toISOString() };
       });
     });
   });
@@ -875,20 +914,16 @@ function loadSamples() {
 function genSQL() {
   if (pts.length === 0) { alert('\uba3c\uc800 \ud658\uc790 \ub370\uc774\ud130\ub97c \ucd94\uac00\ud558\uc138\uc694.'); return; }
   var sql1 = 'INSERT INTO patients (id, name, gender, department, status)\nVALUES\n'
-    + pts.map(function(p) {
-      return "  ('" + p.id + "','" + p.name + "','" + p.gender + "','" + p.dept + "','" + p.status + "')";
-    }).join(',\n') + ';';
+    + pts.map(function(p) { return "  ('" + p.id + "','" + p.name + "','" + p.gender + "','" + p.dept + "','" + p.status + "')"; }).join(',\n') + ';';
   var sql2 = 'INSERT INTO patient_sensitive (patient_id, birth_enc, phone_enc)\nVALUES\n'
-    + pts.map(function(p) {
-      return "  ('" + p.id + "','" + (p.birth_enc||'').substring(0,30) + "...','" + (p.phone_enc||'').substring(0,30) + "...')";
-    }).join(',\n') + ';';
+    + pts.map(function(p) { return "  ('" + p.id + "','" + (p.birth_enc||'').substring(0,30) + "...','" + (p.phone_enc||'').substring(0,30) + "...')"; }).join(',\n') + ';';
   var body = '<div class="m-sec"><div class="m-sec-title">SQL AUTO GENERATED</div>'
     + '<div class="tip-box">\ud83d\udca1 F12 \u2192 Console \ud0ed\uc5d0\uc11c \uc804\uccb4 SQL\uc744 \ubcf5\uc0ac\ud558\uc138\uc694.</div>'
     + '<div class="code-blk"><code>' + esc(sql1) + '\n\n' + esc(sql2) + '</code></div></div>';
   openGenericModal('\ud83d\udcbe', pts.length + '\uba85 SQL INSERT \uc0dd\uc131', 'F12 Console\uc5d0\uc11c \uc804\uccb4 \ubcf5\uc0ac', body, '\ub2eb\uae30', closeModal);
 }
 
-/* ─── CRYPTO DEMO ────────────────────────────── */
+/* ─── CRYPTO ─────────────────────────────────── */
 function buildCryptoDemo() {
   return '<div class="crypto-box">'
     + '<div class="crypto-title">AES-256-GCM ENCRYPTION LAB</div>'
@@ -909,15 +944,11 @@ function buildCryptoDemo() {
     + '<div class="crypto-match" id="cm"></div></div>';
 }
 
-/* ─── CRYPTO FUNCTIONS ───────────────────────── */
 function deriveKey(pw) {
   var enc = new TextEncoder();
   return crypto.subtle.importKey('raw', enc.encode(pw), { name: 'PBKDF2' }, false, ['deriveKey'])
     .then(function(km) {
-      return crypto.subtle.deriveKey(
-        { name: 'PBKDF2', salt: enc.encode('hosp-salt-2024'), iterations: 100000, hash: 'SHA-256' },
-        km, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
-      );
+      return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: enc.encode('hosp-salt-2024'), iterations: 100000, hash: 'SHA-256' }, km, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
     });
 }
 
@@ -929,8 +960,7 @@ function encryptData(text, pw) {
     return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, enc.encode(text));
   }).then(function(ct) {
     var combined = new Uint8Array(iv.length + new Uint8Array(ct).length);
-    combined.set(iv);
-    combined.set(new Uint8Array(ct), iv.length);
+    combined.set(iv); combined.set(new Uint8Array(ct), iv.length);
     return btoa(String.fromCharCode.apply(null, combined));
   }).catch(function() { return 'ENC_ERROR'; });
 }
@@ -940,11 +970,9 @@ function decryptData(b64, pw) {
   try {
     var bytes = Uint8Array.from(atob(b64), function(c) { return c.charCodeAt(0); });
     var iv = bytes.slice(0, 12), data = bytes.slice(12);
-    return deriveKey(pw).then(function(key) {
-      return crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, key, data);
-    }).then(function(dec) {
-      return new TextDecoder().decode(dec);
-    }).catch(function() { return 'DECRYPT_FAILED'; });
+    return deriveKey(pw).then(function(key) { return crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, key, data); })
+      .then(function(dec) { return new TextDecoder().decode(dec); })
+      .catch(function() { return 'DECRYPT_FAILED'; });
   } catch(e) { return Promise.resolve('DECRYPT_FAILED'); }
 }
 
@@ -976,17 +1004,10 @@ function doCryptoMatch() {
   if (!origEl || !decEl || !cmEl) return;
   var orig = origEl.value, dec2 = decEl.textContent;
   if (!orig || dec2.indexOf('\ubc84\ud2bc') !== -1 || dec2 === 'DECRYPT_FAILED') {
-    cmEl.className = 'crypto-match fail';
-    cmEl.textContent = '\u274c \uba3c\uc800 \uc554\ud638\ud654 \u2192 \ubcf5\ud638\ud654\ub97c \uc21c\uc11c\ub300\ub85c \uc2e4\ud589\ud558\uc138\uc694';
-    return;
+    cmEl.className = 'crypto-match fail'; cmEl.textContent = '\u274c \uba3c\uc800 \uc554\ud638\ud654 \u2192 \ubcf5\ud638\ud654\ub97c \uc21c\uc11c\ub300\ub85c \uc2e4\ud589\ud558\uc138\uc694'; return;
   }
-  if (orig.trim() === dec2.trim()) {
-    cmEl.className = 'crypto-match ok';
-    cmEl.textContent = '\u2705 \ub9e4\uce6d \uc131\uacf5! \uc6d0\ubcf8: ' + orig + ' = \ubcf5\ud638\ud654: ' + dec2;
-  } else {
-    cmEl.className = 'crypto-match fail';
-    cmEl.textContent = '\u274c \ub9e4\uce6d \uc2e4\ud328! \ud0a4\ub97c \ud655\uc778\ud558\uc138\uc694.';
-  }
+  if (orig.trim() === dec2.trim()) { cmEl.className = 'crypto-match ok'; cmEl.textContent = '\u2705 \ub9e4\uce6d \uc131\uacf5! \uc6d0\ubcf8: ' + orig + ' = \ubcf5\ud638\ud654: ' + dec2; }
+  else { cmEl.className = 'crypto-match fail'; cmEl.textContent = '\u274c \ub9e4\uce6d \uc2e4\ud328! \ud0a4\ub97c \ud655\uc778\ud558\uc138\uc694.'; }
 }
 
 /* ─── MODAL ──────────────────────────────────── */
@@ -999,8 +1020,7 @@ function openGenericModal(icon, title, num, bodyHtml, doneLabel, doneHandler) {
   document.getElementById('mBody').innerHTML = bodyHtml;
   document.getElementById('mFootL').textContent = '';
   var dBtn = document.getElementById('mDoneBtn');
-  dBtn.textContent = doneLabel;
-  dBtn.style.background = '';
+  dBtn.textContent = doneLabel; dBtn.style.background = '';
   modalDoneHandler = doneHandler;
   document.getElementById('overlay').classList.add('on');
   document.body.style.overflow = 'hidden';
@@ -1017,13 +1037,11 @@ function openModal(stepId) {
   if (!step) return;
   curStep = stepId; tSt = {};
 
-  /* Load saved modal checklist state */
   var savedModalChecks = {};
   try { savedModalChecks = JSON.parse(localStorage.getItem(SK + '_mc_' + stepId) || '{}'); } catch(e) {}
   tSt = savedModalChecks;
 
   var phase = PH[pi];
-
   document.getElementById('mIcon').textContent = phase.icon;
   document.getElementById('mIcon').style.background = phase.color + '20';
   document.getElementById('mIcon').style.color = phase.color;
@@ -1032,7 +1050,6 @@ function openModal(stepId) {
 
   var html = '<div class="m-sec"><div class="m-sec-title">MISSION OBJECTIVE</div><div class="m-desc">' + esc(step.desc) + '</div></div>';
 
-  /* Navigator launch button in modal */
   if (NAV_DATA[stepId]) {
     var navCount = NAV_DATA[stepId].nav.length;
     html += '<div class="m-sec"><div class="m-nav-launch" id="mNavLaunch" data-nav-step="' + stepId + '">'
@@ -1043,9 +1060,7 @@ function openModal(stepId) {
 
   if (step.links && step.links.length) {
     html += '<div class="m-sec"><div class="m-sec-title">QUICK LINKS</div><div class="links-row">'
-      + step.links.map(function(l) {
-        return '<a class="mlink ' + esc(l.c || 'def') + '" href="' + esc(l.u) + '" target="_blank" rel="noopener">\ud83c\udf10 ' + esc(l.l) + '</a>';
-      }).join('') + '</div></div>';
+      + step.links.map(function(l) { return '<a class="mlink ' + esc(l.c || 'def') + '" href="' + esc(l.u) + '" target="_blank" rel="noopener">\ud83c\udf10 ' + esc(l.l) + '</a>'; }).join('') + '</div></div>';
   }
 
   if (step.tasks && step.tasks.length) {
@@ -1058,43 +1073,26 @@ function openModal(stepId) {
       }).join('') + '</div></div>';
   }
 
-  if (step.code) {
-    html += '<div class="m-sec"><div class="m-sec-title">CODE / SQL</div>'
-      + '<div class="code-blk"><code>' + esc(step.code) + '</code></div></div>';
-  }
+  if (step.code) html += '<div class="m-sec"><div class="m-sec-title">CODE / SQL</div><div class="code-blk"><code>' + esc(step.code) + '</code></div></div>';
   if (step.tip) html += '<div class="tip-box">\ud83d\udca1 <b>\ud301:</b> ' + esc(step.tip) + '</div>';
   if (step.warn) html += '<div class="warn-box">\u26a0\ufe0f <b>\uc8fc\uc758:</b> ' + esc(step.warn) + '</div>';
 
   document.getElementById('mBody').innerHTML = html;
   updateMTaskSt(step);
 
-  var mBody = document.getElementById('mBody');
-  mBody.onclick = function(e) {
+  document.getElementById('mBody').onclick = function(e) {
     var taskEl = e.target.closest('.task[data-ti]');
     if (taskEl) {
       var i = parseInt(taskEl.getAttribute('data-ti'));
       tSt[i] = !tSt[i];
-      /* Save instantly */
       localStorage.setItem(SK + '_mc_' + stepId, JSON.stringify(tSt));
-
       var tk = document.getElementById('tk_' + i);
-      if (tSt[i]) {
-        taskEl.classList.add('dn');
-        taskEl.classList.add('check-flash');
-        if (tk) tk.innerHTML = '&#10003;';
-        setTimeout(function() { taskEl.classList.remove('check-flash'); }, 400);
-      } else {
-        taskEl.classList.remove('dn');
-        if (tk) tk.innerHTML = '';
-      }
+      if (tSt[i]) { taskEl.classList.add('dn'); taskEl.classList.add('check-flash'); if (tk) tk.innerHTML = '&#10003;'; setTimeout(function() { taskEl.classList.remove('check-flash'); }, 400); }
+      else { taskEl.classList.remove('dn'); if (tk) tk.innerHTML = ''; }
       updateMTaskSt(step);
     }
-    /* Navigator launch from modal */
     var navLaunch = e.target.closest('#mNavLaunch');
-    if (navLaunch) {
-      closeModal();
-      enterNavMode(navLaunch.getAttribute('data-nav-step'));
-    }
+    if (navLaunch) { closeModal(); enterNavMode(navLaunch.getAttribute('data-nav-step')); }
   };
 
   var done = isDone(stepId);
@@ -1121,20 +1119,16 @@ function closeModal() {
 
 document.getElementById('mCloseBtn').addEventListener('click', closeModal);
 document.getElementById('mCancelBtn').addEventListener('click', closeModal);
-document.getElementById('mDoneBtn').addEventListener('click', function() {
-  if (modalDoneHandler) modalDoneHandler();
-});
-document.getElementById('overlay').addEventListener('click', function(e) {
-  if (e.target === this) closeModal();
-});
+document.getElementById('mDoneBtn').addEventListener('click', function() { if (modalDoneHandler) modalDoneHandler(); });
+document.getElementById('overlay').addEventListener('click', function(e) { if (e.target === this) closeModal(); });
 
 function completeStep(stepId) {
   var wasDone = isDone(stepId);
   setDone(stepId, !wasDone);
-  var step = null, pi = -1, si = -1;
+  var step = null;
   for (var i = 0; i < PH.length; i++) {
     for (var j = 0; j < PH[i].steps.length; j++) {
-      if (PH[i].steps[j].id === stepId) { step = PH[i].steps[j]; pi = i; si = j; break; }
+      if (PH[i].steps[j].id === stepId) { step = PH[i].steps[j]; break; }
     }
     if (step) break;
   }
@@ -1143,25 +1137,45 @@ function completeStep(stepId) {
   if (curPhId) showPhaseView(curPhId);
 }
 
-/* ─── TOAST ──────────────────────────────────── */
 function showToast(msg) {
   var t = document.getElementById('toast');
-  t.textContent = msg;
-  t.classList.add('on');
+  t.textContent = msg; t.classList.add('on');
   setTimeout(function() { t.classList.remove('on'); }, 3000);
 }
 
 /* ─── BOOT ───────────────────────────────────── */
+initSupabase();
 loadSt();
 loadData(function() {
-  var savedUser = localStorage.getItem(SK + '_user');
-  if (savedUser) {
-    document.getElementById('loginScreen').style.display = 'none';
-    document.getElementById('appShell').classList.add('on');
-    document.getElementById('userAv').textContent = savedUser[0].toUpperCase();
-    curUser = savedUser;
-    renderSidebar(); updateTopPct(); showWelcome();
+  if (!sbReady) {
+    /* Supabase SDK not loaded yet, wait a bit */
+    setTimeout(function() {
+      initSupabase();
+      checkAuthState();
+    }, 1000);
+  } else {
+    checkAuthState();
   }
 });
+
+function checkAuthState() {
+  if (sbReady && sb) {
+    sb.auth.getSession().then(function(res) {
+      if (res.data && res.data.session && res.data.session.user) {
+        launch(res.data.session.user);
+      }
+      /* else: stay on login screen */
+    });
+
+    /* Listen for auth state changes (OAuth redirect callback) */
+    sb.auth.onAuthStateChange(function(event, session) {
+      if (event === 'SIGNED_IN' && session && session.user) {
+        launch(session.user);
+      } else if (event === 'SIGNED_OUT') {
+        doLogout();
+      }
+    });
+  }
+}
 
 })();
