@@ -5,11 +5,16 @@
 (function() {
 'use strict';
 
-/* ─── STARFIELD ──────────────────────────────── */
+/* ─── ADVANCED STARFIELD + SHOOTING STARS ────── */
 var canvas = document.getElementById('starfield');
 var ctx = canvas.getContext('2d');
 var stars = [];
-var STAR_COUNT = 200;
+var shootingStars = [];
+var STAR_COUNT = 280;
+var STAR_COLORS = [
+  [200,210,255], [180,200,255], [255,220,200], [200,255,240],
+  [220,200,255], [255,200,220], [200,240,255]
+];
 
 function resizeCanvas() {
   canvas.width = window.innerWidth;
@@ -19,14 +24,32 @@ function resizeCanvas() {
 function initStars() {
   stars = [];
   for (var i = 0; i < STAR_COUNT; i++) {
+    var c = STAR_COLORS[Math.floor(Math.random() * STAR_COLORS.length)];
     stars.push({
       x: Math.random() * canvas.width,
       y: Math.random() * canvas.height,
-      r: Math.random() * 1.5 + 0.3,
-      dx: (Math.random() - 0.5) * 0.15,
-      dy: (Math.random() - 0.5) * 0.15,
+      r: Math.random() * 1.8 + 0.2,
+      dx: (Math.random() - 0.5) * 0.12,
+      dy: (Math.random() - 0.5) * 0.12,
       a: Math.random() * 0.7 + 0.3,
-      twinkleSpeed: Math.random() * 0.02 + 0.005
+      twinkleSpeed: Math.random() * 0.02 + 0.005,
+      color: c
+    });
+  }
+}
+
+function spawnShootingStar() {
+  if (shootingStars.length < 2 && Math.random() < 0.006) {
+    var angle = Math.random() * 0.4 + 0.3;
+    var speed = Math.random() * 6 + 4;
+    shootingStars.push({
+      x: Math.random() * canvas.width * 0.8,
+      y: Math.random() * canvas.height * 0.4,
+      len: Math.random() * 60 + 40,
+      dx: Math.cos(angle) * speed,
+      dy: Math.sin(angle) * speed,
+      life: 1,
+      decay: Math.random() * 0.015 + 0.012
     });
   }
 }
@@ -34,20 +57,59 @@ function initStars() {
 function drawStars() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   var time = Date.now() * 0.001;
+
+  /* Regular stars */
   for (var i = 0; i < stars.length; i++) {
     var s = stars[i];
-    s.x += s.dx;
-    s.y += s.dy;
+    s.x += s.dx; s.y += s.dy;
     if (s.x < 0) s.x = canvas.width;
     if (s.x > canvas.width) s.x = 0;
     if (s.y < 0) s.y = canvas.height;
     if (s.y > canvas.height) s.y = 0;
-    var alpha = s.a * (0.6 + 0.4 * Math.sin(time * s.twinkleSpeed * 60));
+    var alpha = s.a * (0.5 + 0.5 * Math.sin(time * s.twinkleSpeed * 60));
     ctx.beginPath();
     ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(200,210,255,' + alpha + ')';
+    ctx.fillStyle = 'rgba(' + s.color[0] + ',' + s.color[1] + ',' + s.color[2] + ',' + alpha + ')';
     ctx.fill();
+    /* Add subtle glow to larger stars */
+    if (s.r > 1.2) {
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, s.r * 3, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(' + s.color[0] + ',' + s.color[1] + ',' + s.color[2] + ',' + (alpha * 0.06) + ')';
+      ctx.fill();
+    }
   }
+
+  /* Shooting stars */
+  spawnShootingStar();
+  for (var j = shootingStars.length - 1; j >= 0; j--) {
+    var ss = shootingStars[j];
+    ss.x += ss.dx; ss.y += ss.dy;
+    ss.life -= ss.decay;
+    if (ss.life <= 0 || ss.x > canvas.width || ss.y > canvas.height) {
+      shootingStars.splice(j, 1);
+      continue;
+    }
+    ctx.save();
+    var grad = ctx.createLinearGradient(ss.x, ss.y, ss.x - ss.dx * (ss.len / Math.sqrt(ss.dx*ss.dx+ss.dy*ss.dy)), ss.y - ss.dy * (ss.len / Math.sqrt(ss.dx*ss.dx+ss.dy*ss.dy)));
+    grad.addColorStop(0, 'rgba(200,230,255,' + (ss.life * 0.9) + ')');
+    grad.addColorStop(0.3, 'rgba(100,200,255,' + (ss.life * 0.4) + ')');
+    grad.addColorStop(1, 'rgba(100,180,255,0)');
+    ctx.strokeStyle = grad;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(ss.x, ss.y);
+    var tailLen = ss.len * ss.life;
+    ctx.lineTo(ss.x - ss.dx * (tailLen / Math.sqrt(ss.dx*ss.dx+ss.dy*ss.dy)), ss.y - ss.dy * (tailLen / Math.sqrt(ss.dx*ss.dx+ss.dy*ss.dy)));
+    ctx.stroke();
+    /* Head glow */
+    ctx.beginPath();
+    ctx.arc(ss.x, ss.y, 2, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(220,240,255,' + (ss.life * 0.8) + ')';
+    ctx.fill();
+    ctx.restore();
+  }
+
   requestAnimationFrame(drawStars);
 }
 
