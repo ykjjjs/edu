@@ -469,8 +469,8 @@ function showPhaseView(phId) {
     + '<div class="ph-badge' + (allDone2 ? ' done' : '') + '">' + done + '/' + total + ' \uc644\ub8cc</div>'
     + '</div>';
 
-  if (phId === 'p4') html += buildPatientSection() + buildCryptoDemo();
-  if (phId === 'p9') html += buildAILabSection();
+  if (phId === 'p5') html += buildPatientSection() + buildCryptoDemo();
+  if (phId === 'p1') html += buildAILabSection();
 
   html += '<div class="steps-list">';
   for (var si = 0; si < phase.steps.length; si++) {
@@ -490,14 +490,14 @@ function showPhaseView(phId) {
     if (e.target.closest('#ptSqlBtn')) { genSQL(); return; }
     if (e.target.closest('#ptClearBtn')) {
       if (confirm('\ubaa8\ub4e0 \ud658\uc790 \ub370\uc774\ud130\ub97c \uc0ad\uc81c\ud558\uc2dc\uaca0\uc2b5\ub2c8\uae4c?')) {
-        pts = []; saveSt(); showPhaseView('p4');
+        pts = []; saveSt(); showPhaseView('p5');
       }
       return;
     }
     var delBtn = e.target.closest('.pt-del');
     if (delBtn) {
       var idx = parseInt(delBtn.getAttribute('data-idx'));
-      if (!isNaN(idx)) { pts.splice(idx, 1); saveSt(); showPhaseView('p4'); }
+      if (!isNaN(idx)) { pts.splice(idx, 1); saveSt(); showPhaseView('p5'); }
       return;
     }
     if (e.target.closest('#encBtn')) { doCryptoEnc(); return; }
@@ -507,7 +507,7 @@ function showPhaseView(phId) {
 
   renderSidebar();
   updateTopPct();
-  if (phId === 'p9') wireAILabEvents();
+  if (phId === 'p1') wireAILabEvents();
 }
 
 function renderStepCard(s, pi, si) {
@@ -888,7 +888,7 @@ function savePatient() {
   encryptData(birth || '', 'hospitalKey2024!').then(function(be) {
     encryptData(phone || '', 'hospitalKey2024!').then(function(pe) {
       pts.push({ id: uid, name: name, gender: gen, dept: dept, status: st2, birth_enc: be, phone_enc: pe, created_at: new Date().toISOString() });
-      saveSt(); closeModal(); showPhaseView('p4');
+      saveSt(); closeModal(); showPhaseView('p5');
       showToast('\u2705 \ud658\uc790 \ucd94\uac00 & \uc554\ud638\ud654 \uc644\ub8cc!');
     });
   });
@@ -910,7 +910,7 @@ function loadSamples() {
     });
   });
   Promise.all(proms).then(function(newPts) {
-    pts = pts.concat(newPts); saveSt(); showPhaseView('p4');
+    pts = pts.concat(newPts); saveSt(); showPhaseView('p5');
     showToast('\u2705 \uc0d8\ud50c 5\uba85 \ucd94\uac00!');
   });
 }
@@ -1341,7 +1341,7 @@ function wireAILabEvents() {
       var count = parseInt(document.getElementById('aiRowCount').value) || 100;
       aiLabData = generateMedicalCSV(count);
       aiLabProcessed = null;
-      showPhaseView('p9');
+      showPhaseView('p1');
       showToast('\ud83d\ude80 ' + count + '\ud589 \uc758\ub8cc \ub370\uc774\ud130 \uc0dd\uc131 \uc644\ub8cc!');
       return;
     }
@@ -1353,7 +1353,7 @@ function wireAILabEvents() {
     /* Process data */
     if (e.target.closest('#aiProcessBtn') && aiLabData) {
       aiLabProcessed = processData(aiLabData);
-      showPhaseView('p9');
+      showPhaseView('p1');
       showToast('\u2705 \ub370\uc774\ud130 \uc790\ub3d9 \uac00\uacf5 \uc644\ub8cc!');
       return;
     }
