@@ -42,6 +42,12 @@
         "url": "https://web.telegram.org",
         "label": "Telegram 웹",
         "hint": "전화번호로 인증 후 로그인"
+      },
+      {
+        "task": 7,
+        "url": "https://www.kaggle.com",
+        "label": "Kaggle 로그인",
+        "hint": "Google 계정으로 Sign in → 대시보드 진입"
       }
     ]
   },
