@@ -19,7 +19,7 @@ app.get('/favicon.ico', (c) => {
 })
 
 app.get('/api/health', (c) => {
-  return c.json({ status: 'ok', version: 'v7.0-space' })
+  return c.json({ status: 'ok', version: 'v8.1-turbo-nav' })
 })
 
 app.get('/', (c) => {
@@ -30,7 +30,7 @@ app.get('/', (c) => {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="X-Content-Type-Options" content="nosniff">
 <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
-<title>STELLAR EDU - Web Service Mastery Platform</title>
+<title>STELLAR EDU v8.1 - Turbo Navigator</title>
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;900&family=JetBrains+Mono:wght@400;600&family=Orbitron:wght@400;600;700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/styles.css">
@@ -118,6 +118,13 @@ app.get('/', (c) => {
   </div>
 </div>
 <div class="toast" id="toast"></div>
+<div class="nav-container" id="navContainer">
+  <div class="nav-left" id="navLeft"></div>
+  <div class="nav-right">
+    <iframe class="nav-iframe" id="navIframe" src="about:blank" sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-top-navigation allow-popups-to-escape-sandbox"></iframe>
+    <div class="nav-placeholder" id="navPlaceholder" style="display:none"></div>
+  </div>
+</div>
 <script src="/static/app.js"></script>
 </body>
 </html>`)

@@ -1,0 +1,243 @@
+{
+  "s0_1": {
+    "nav": [
+      {"task": 0, "url": "https://accounts.google.com", "label": "Google 로그인", "hint": "구글 계정으로 로그인하세요. 로그인 완료 후 체크!"},
+      {"task": 1, "url": "https://supabase.com", "label": "Supabase 로그인", "hint": "Continue with Google 클릭 → 대시보드 진입"},
+      {"task": 2, "url": "https://github.com/login", "label": "GitHub 로그인", "hint": "Sign in with Google 선택"},
+      {"task": 3, "url": "https://dash.cloudflare.com/sign-up", "label": "Cloudflare 가입", "hint": "구글 계정으로 가입/로그인"},
+      {"task": 4, "url": "https://www.genspark.ai", "label": "GenSpark 로그인", "hint": "구글 계정으로 로그인"},
+      {"task": 5, "url": "https://claude.ai", "label": "Claude AI 로그인", "hint": "구글 계정으로 로그인"},
+      {"task": 6, "url": "https://web.telegram.org", "label": "Telegram 웹", "hint": "전화번호로 인증 후 로그인"}
+    ]
+  },
+  "s0_2": {
+    "nav": [
+      {"task": 0, "url": "https://www.genspark.ai", "label": "GenSpark 접속", "hint": "AI 코딩 도구에 접속하세요"},
+      {"task": 1, "url": "https://www.genspark.ai", "label": "프롬프트 입력", "hint": "코드 블록의 프롬프트를 복사해서 입력하세요"},
+      {"task": 2, "url": "https://www.genspark.ai", "label": "미리보기 확인", "hint": "생성된 HTML을 미리보기로 확인"},
+      {"task": 3, "url": "https://www.genspark.ai", "label": "코드 복사", "hint": "[Export HTML] 또는 코드 전체 복사"},
+      {"task": 4, "url": null, "label": "파일 저장", "hint": "메모장이나 VS Code에서 index.html로 저장"},
+      {"task": 5, "url": null, "label": "브라우저 확인", "hint": "저장한 파일을 브라우저로 열어 동작 확인"}
+    ]
+  },
+  "s0_3": {
+    "nav": [
+      {"task": 0, "url": "https://claude.ai", "label": "Claude AI 접속", "hint": "AI 코드 정제 도구에 접속"},
+      {"task": 1, "url": "https://claude.ai", "label": "코드 붙여넣기", "hint": "GenSpark에서 만든 HTML 코드를 Claude에 붙여넣기"},
+      {"task": 2, "url": "https://claude.ai", "label": "암호화 요청", "hint": "AES-256-GCM 암호화 추가를 요청하세요"},
+      {"task": 3, "url": "https://claude.ai", "label": "코드 검토", "hint": "수정된 코드를 검토하고 복사"},
+      {"task": 4, "url": null, "label": "파일 교체", "hint": "index.html을 새 코드로 교체 후 테스트"}
+    ]
+  },
+  "s1_1": {
+    "nav": [
+      {"task": 0, "url": "https://github.com/new", "label": "GitHub 저장소 생성", "hint": "Repository name 입력 → Public 선택"},
+      {"task": 1, "url": "https://github.com/new", "label": "설정 확인", "hint": "Add README, .gitignore(Node) 체크"},
+      {"task": 2, "url": "https://github.com", "label": "저장소 확인", "hint": "생성된 저장소 페이지 확인"},
+      {"task": 3, "url": "https://github.com", "label": "파일 업로드", "hint": "Add file → Upload files 클릭"},
+      {"task": 4, "url": "https://github.com", "label": "index.html 업로드", "hint": "만든 index.html을 드래그&드롭"},
+      {"task": 5, "url": "https://github.com", "label": "커밋 확인", "hint": "Commit changes → 파일 목록 확인"},
+      {"task": 6, "url": "https://github.com", "label": "폴더 구조 확인", "hint": "파일 구조가 올바른지 확인"}
+    ]
+  },
+  "s1_2": {
+    "nav": [
+      {"task": 0, "url": "https://github.com", "label": "Settings 진입", "hint": "저장소 → Settings 탭 클릭"},
+      {"task": 1, "url": "https://github.com", "label": "Branch 보호 설정", "hint": "Branches → Add rule"},
+      {"task": 2, "url": "https://github.com", "label": "팀원 초대", "hint": "Settings → Collaborators → Invite"},
+      {"task": 3, "url": "https://github.com", "label": "초대 확인", "hint": "팀원이 초대를 수락했는지 확인"}
+    ]
+  },
+  "s2_1": {
+    "nav": [
+      {"task": 0, "url": "https://dash.cloudflare.com", "label": "Cloudflare 대시보드", "hint": "Workers & Pages 메뉴 클릭"},
+      {"task": 1, "url": "https://dash.cloudflare.com", "label": "Pages 프로젝트 생성", "hint": "Create application → Pages 선택"},
+      {"task": 2, "url": "https://dash.cloudflare.com", "label": "GitHub 연동", "hint": "Connect to Git → GitHub 계정 연결"},
+      {"task": 3, "url": "https://dash.cloudflare.com", "label": "저장소 선택", "hint": "만든 저장소를 선택"},
+      {"task": 4, "url": "https://dash.cloudflare.com", "label": "빌드 설정", "hint": "Framework: None → 빌드 명령어 비우기"},
+      {"task": 5, "url": "https://dash.cloudflare.com", "label": "배포 시작", "hint": "Save and Deploy 클릭"},
+      {"task": 6, "url": null, "label": "URL 확인", "hint": "배포 완료 후 .pages.dev URL을 브라우저에서 확인"}
+    ]
+  },
+  "s2_2": {
+    "nav": [
+      {"task": 0, "url": "https://github.com", "label": "_headers 파일 생성", "hint": "GitHub에서 Add file → _headers 파일 생성"},
+      {"task": 1, "url": "https://github.com", "label": "보안 헤더 입력", "hint": "코드 블록의 보안 헤더를 복사해서 입력"},
+      {"task": 2, "url": "https://dash.cloudflare.com", "label": "재배포 확인", "hint": "커밋 후 자동 배포 대기 (45~90초)"},
+      {"task": 3, "url": "https://securityheaders.com", "label": "Security Headers 검사", "hint": "배포 URL 입력 후 Scan 클릭"},
+      {"task": 4, "url": "https://developer.mozilla.org/en-US/observatory", "label": "MDN Observatory 검사", "hint": "배포 URL 입력 후 스캔"},
+      {"task": 5, "url": "https://www.ssllabs.com/ssltest/", "label": "SSL Labs 검사", "hint": "도메인 입력 후 Submit"}
+    ]
+  },
+  "s3_1": {
+    "nav": [
+      {"task": 0, "url": "https://www.gabia.com", "label": "가비아 접속", "hint": "도메인 검색 → 원하는 도메인 구매"},
+      {"task": 1, "url": "https://www.gabia.com", "label": "도메인 구매", "hint": "결제 완료"},
+      {"task": 2, "url": "https://dash.cloudflare.com", "label": "Cloudflare 사이트 추가", "hint": "Add a site → 도메인 입력"},
+      {"task": 3, "url": "https://dash.cloudflare.com", "label": "NS 레코드 확인", "hint": "Cloudflare 네임서버 2개 복사"},
+      {"task": 4, "url": "https://www.gabia.com", "label": "NS 변경", "hint": "가비아 → 네임서버 설정 → Cloudflare NS 입력"},
+      {"task": 5, "url": "https://dash.cloudflare.com", "label": "NS 전파 확인", "hint": "Cloudflare에서 NS 변경 확인 대기 (최대 24h)"}
+    ]
+  },
+  "s3_2": {
+    "nav": [
+      {"task": 0, "url": "https://dash.cloudflare.com", "label": "Pages 프로젝트 열기", "hint": "Workers & Pages → 프로젝트 선택"},
+      {"task": 1, "url": "https://dash.cloudflare.com", "label": "Custom domains", "hint": "Custom domains 탭 → Set up a custom domain"},
+      {"task": 2, "url": "https://dash.cloudflare.com", "label": "도메인 입력", "hint": "구매한 도메인 입력 → Activate"},
+      {"task": 3, "url": "https://dash.cloudflare.com", "label": "DNS 확인", "hint": "CNAME 레코드 자동 생성 확인"},
+      {"task": 4, "url": null, "label": "접속 테스트", "hint": "https://도메인.com으로 접속 확인"}
+    ]
+  },
+  "s4_1": {
+    "nav": [
+      {"task": 0, "url": "https://supabase.com/dashboard", "label": "Supabase 대시보드", "hint": "New project 클릭"},
+      {"task": 1, "url": "https://supabase.com/dashboard", "label": "프로젝트 생성", "hint": "이름, 비밀번호, 리전(Northeast Asia) 설정"},
+      {"task": 2, "url": "https://supabase.com/dashboard", "label": "프로젝트 대기", "hint": "생성 완료까지 1-2분 대기"},
+      {"task": 3, "url": "https://supabase.com/dashboard", "label": "Settings 이동", "hint": "Project Settings → API"},
+      {"task": 4, "url": "https://supabase.com/dashboard", "label": "Project URL 복사", "hint": "URL을 메모장에 저장"},
+      {"task": 5, "url": "https://supabase.com/dashboard", "label": "anon key 복사", "hint": "anon/public 키를 메모장에 저장"},
+      {"task": 6, "url": "https://supabase.com/dashboard", "label": "service_role key 복사", "hint": "service_role 키를 메모장에 저장 (비공개!)"}
+    ]
+  },
+  "s4_2": {
+    "nav": [
+      {"task": 0, "url": "https://supabase.com/dashboard/project/_/sql", "label": "SQL Editor 열기", "hint": "왼쪽 메뉴에서 SQL Editor 클릭"},
+      {"task": 1, "url": "https://supabase.com/dashboard/project/_/sql", "label": "patients 테이블 SQL", "hint": "코드 블록의 CREATE TABLE SQL 복사 후 실행"},
+      {"task": 2, "url": "https://supabase.com/dashboard/project/_/sql", "label": "patient_sensitive 테이블", "hint": "암호화 필드 테이블 SQL 실행"},
+      {"task": 3, "url": "https://supabase.com/dashboard/project/_/sql", "label": "RLS 정책 설정", "hint": "Row Level Security 정책 SQL 실행"},
+      {"task": 4, "url": "https://supabase.com/dashboard/project/_/editor", "label": "Table Editor 확인", "hint": "Table Editor에서 생성된 테이블 확인"}
+    ]
+  },
+  "s4_3": {
+    "nav": [
+      {"task": 0, "url": null, "label": "환자 데이터 입력", "hint": "이 페이지의 환자 관리 섹션에서 + 환자 추가 클릭"},
+      {"task": 1, "url": null, "label": "샘플 데이터 추가", "hint": "샘플 5명 추가 버튼으로 테스트 데이터 생성"},
+      {"task": 2, "url": null, "label": "암호화 확인", "hint": "생년월일/전화번호가 암호화된 것을 확인"},
+      {"task": 3, "url": null, "label": "SQL 생성", "hint": "SQL INSERT 생성 버튼 클릭"},
+      {"task": 4, "url": "https://supabase.com/dashboard/project/_/sql", "label": "SQL 실행", "hint": "생성된 SQL을 Supabase SQL Editor에 붙여넣기 실행"},
+      {"task": 5, "url": "https://supabase.com/dashboard/project/_/editor", "label": "데이터 확인", "hint": "Table Editor에서 저장된 데이터 확인"}
+    ]
+  },
+  "s4_4": {
+    "nav": [
+      {"task": 0, "url": "https://supabase.com/dashboard/project/_/editor", "label": "Table Editor 열기", "hint": "Table Editor → patients 테이블 선택"},
+      {"task": 1, "url": "https://supabase.com/dashboard/project/_/editor", "label": "CSV 준비", "hint": "샘플 CSV 파일 준비 (Excel → CSV 변환)"},
+      {"task": 2, "url": "https://supabase.com/dashboard/project/_/editor", "label": "Import Data", "hint": "Insert → Import data from CSV 클릭"},
+      {"task": 3, "url": "https://supabase.com/dashboard/project/_/editor", "label": "CSV 업로드", "hint": "CSV 파일 드래그&드롭 또는 선택"},
+      {"task": 4, "url": "https://supabase.com/dashboard/project/_/editor", "label": "결과 확인", "hint": "Import 완료 후 데이터 행 확인"}
+    ]
+  },
+  "s5_1": {
+    "nav": [
+      {"task": 0, "url": "https://console.cloud.google.com/apis/credentials", "label": "GCP 콘솔 → 사용자 인증", "hint": "APIs & Services → Credentials"},
+      {"task": 1, "url": "https://console.cloud.google.com/apis/credentials", "label": "OAuth 동의 화면", "hint": "OAuth consent screen → External → 생성"},
+      {"task": 2, "url": "https://console.cloud.google.com/apis/credentials", "label": "OAuth 2.0 클라이언트 ID", "hint": "Create Credentials → OAuth client ID"},
+      {"task": 3, "url": "https://console.cloud.google.com/apis/credentials", "label": "웹 애플리케이션 선택", "hint": "Application type: Web application"},
+      {"task": 4, "url": "https://console.cloud.google.com/apis/credentials", "label": "리디렉션 URI 입력", "hint": "Supabase 리디렉션 URI 입력"},
+      {"task": 5, "url": "https://console.cloud.google.com/apis/credentials", "label": "Client ID 복사", "hint": "클라이언트 ID를 메모장에 저장"},
+      {"task": 6, "url": "https://console.cloud.google.com/apis/credentials", "label": "Client Secret 복사", "hint": "클라이언트 시크릿을 메모장에 저장"}
+    ]
+  },
+  "s5_2": {
+    "nav": [
+      {"task": 0, "url": "https://supabase.com/dashboard/project/_/auth/providers", "label": "Supabase Auth 설정", "hint": "Authentication → Providers 메뉴"},
+      {"task": 1, "url": "https://supabase.com/dashboard/project/_/auth/providers", "label": "Google Provider 활성화", "hint": "Google 토글 ON"},
+      {"task": 2, "url": "https://supabase.com/dashboard/project/_/auth/providers", "label": "Client ID 입력", "hint": "GCP에서 복사한 Client ID 붙여넣기"},
+      {"task": 3, "url": "https://supabase.com/dashboard/project/_/auth/providers", "label": "Client Secret 입력", "hint": "GCP에서 복사한 Secret 붙여넣기"},
+      {"task": 4, "url": "https://supabase.com/dashboard/project/_/auth/providers", "label": "Redirect URL 복사", "hint": "Supabase의 Redirect URL을 GCP에도 등록"},
+      {"task": 5, "url": null, "label": "로그인 테스트", "hint": "배포 사이트에서 Google 로그인 테스트"}
+    ]
+  },
+  "s6_1": {
+    "nav": [
+      {"task": 0, "url": "https://t.me/BotFather", "label": "BotFather 접속", "hint": "Telegram에서 @BotFather 검색 → /start"},
+      {"task": 1, "url": "https://t.me/BotFather", "label": "봇 생성", "hint": "/newbot 명령 → 봇 이름 → 유저네임 입력"},
+      {"task": 2, "url": "https://t.me/BotFather", "label": "토큰 복사", "hint": "HTTP API 토큰을 메모장에 저장"},
+      {"task": 3, "url": "https://web.telegram.org", "label": "그룹 생성", "hint": "Telegram에서 새 그룹 생성 → 봇 추가"},
+      {"task": 4, "url": "https://t.me/userinfobot", "label": "Chat ID 확인", "hint": "@userinfobot에서 Chat ID 확인"},
+      {"task": 5, "url": null, "label": "테스트 메시지", "hint": "API로 봇 메시지 전송 테스트"}
+    ]
+  },
+  "s6_2": {
+    "nav": [
+      {"task": 0, "url": "https://github.com", "label": "GitHub 저장소 열기", "hint": "프로젝트 저장소 접속"},
+      {"task": 1, "url": "https://github.com", "label": "functions 폴더 생성", "hint": "Add file → functions/api/notify.js 생성"},
+      {"task": 2, "url": "https://github.com", "label": "알림 코드 입력", "hint": "코드 블록의 Edge Function 코드 복사"},
+      {"task": 3, "url": "https://dash.cloudflare.com", "label": "환경 변수 설정", "hint": "Settings → Environment variables → 봇 토큰/Chat ID 추가"},
+      {"task": 4, "url": "https://dash.cloudflare.com", "label": "배포 확인", "hint": "자동 배포 완료 대기"},
+      {"task": 5, "url": null, "label": "API 테스트", "hint": "배포URL/api/notify 엔드포인트 테스트"}
+    ]
+  },
+  "s7_1": {
+    "nav": [
+      {"task": 0, "url": "https://supabase.com/dashboard", "label": "Supabase 대시보드", "hint": "프로젝트 선택"},
+      {"task": 1, "url": "https://supabase.com/dashboard/project/_/realtime/inspector", "label": "Realtime Inspector", "hint": "Database → Realtime 설정 확인"},
+      {"task": 2, "url": "https://supabase.com/dashboard/project/_/editor", "label": "테이블 Realtime 활성화", "hint": "Table Editor → Realtime 토글 ON"},
+      {"task": 3, "url": "https://github.com", "label": "코드 수정", "hint": "supabase.channel() 코드 추가"},
+      {"task": 4, "url": "https://dash.cloudflare.com", "label": "배포 확인", "hint": "자동 배포 대기"},
+      {"task": 5, "url": null, "label": "실시간 테스트", "hint": "두 브라우저 탭에서 데이터 변경 시 실시간 반영 확인"}
+    ]
+  },
+  "s7_2": {
+    "nav": [
+      {"task": 0, "url": "https://web.telegram.org", "label": "Telegram 그룹 열기", "hint": "실습용 그룹 채팅방 열기"},
+      {"task": 1, "url": "https://web.telegram.org", "label": "배포 URL 공유", "hint": "Cloudflare Pages URL을 그룹에 공유"},
+      {"task": 2, "url": null, "label": "팀원 접속 확인", "hint": "팀원들이 URL 클릭 → 사이트 접속 확인"},
+      {"task": 3, "url": null, "label": "Google 로그인 확인", "hint": "팀원들이 Google 로그인 성공 확인"},
+      {"task": 4, "url": "https://supabase.com/dashboard/project/_/editor", "label": "데이터 확인", "hint": "Supabase에서 팀원 데이터 확인"},
+      {"task": 5, "url": "https://web.telegram.org", "label": "봇 알림 확인", "hint": "Telegram에서 봇 알림 도착 확인"},
+      {"task": 6, "url": null, "label": "실시간 동기화", "hint": "한 팀원이 데이터 입력 → 다른 팀원 화면 자동 갱신 확인"}
+    ]
+  },
+  "s7_3": {
+    "nav": [
+      {"task": 0, "url": "https://claude.ai", "label": "Claude AI 접속", "hint": "프롬프트 팀 자산화 작업 시작"},
+      {"task": 1, "url": "https://www.genspark.ai", "label": "GenSpark 접속", "hint": "팀에서 사용한 프롬프트 정리"},
+      {"task": 2, "url": "https://web.telegram.org", "label": "Telegram 공유", "hint": "정리된 프롬프트를 Telegram 그룹에 공유"},
+      {"task": 3, "url": "https://github.com", "label": "GitHub에 저장", "hint": "프롬프트를 PROMPTS.md로 저장소에 커밋"}
+    ]
+  },
+  "s7_4": {
+    "nav": [
+      {"task": 0, "url": "https://dash.cloudflare.com", "label": "Cloudflare 확인", "hint": "배포 상태, 도메인, SSL 확인"},
+      {"task": 1, "url": "https://supabase.com/dashboard", "label": "Supabase 확인", "hint": "DB, Auth, Realtime 상태 확인"},
+      {"task": 2, "url": "https://web.telegram.org", "label": "Telegram 확인", "hint": "봇 알림, 그룹 공유 상태 확인"},
+      {"task": 3, "url": "https://securityheaders.com", "label": "보안 헤더 확인", "hint": "최종 보안 등급 스캔"},
+      {"task": 4, "url": "https://github.com", "label": "GitHub 최종 확인", "hint": "모든 코드가 커밋되었는지 확인"},
+      {"task": 5, "url": null, "label": "체크리스트 완료", "hint": "모든 항목 최종 점검"},
+      {"task": 6, "url": null, "label": "강의 마무리", "hint": "전체 시스템 정상 동작 확인!"}
+    ]
+  },
+  "s8_1": {
+    "nav": [
+      {"task": 0, "url": "https://securityheaders.com", "label": "Security Headers 접속", "hint": "사이트 주소 입력"},
+      {"task": 1, "url": "https://securityheaders.com", "label": "스캔 실행", "hint": "Scan 클릭 → 결과 확인"},
+      {"task": 2, "url": "https://securityheaders.com", "label": "등급 확인", "hint": "A+ 등급 목표"},
+      {"task": 3, "url": "https://github.com", "label": "_headers 수정", "hint": "누락된 헤더 추가 후 재배포"},
+      {"task": 4, "url": "https://securityheaders.com", "label": "재스캔", "hint": "배포 후 재스캔으로 등급 확인"},
+      {"task": 5, "url": "https://securityheaders.com", "label": "결과 캡처", "hint": "최종 결과 스크린샷 저장"},
+      {"task": 6, "url": null, "label": "완료 기록", "hint": "달성 등급 기록"}
+    ]
+  },
+  "s8_2": {
+    "nav": [
+      {"task": 0, "url": "https://developer.mozilla.org/en-US/observatory", "label": "MDN Observatory 접속", "hint": "URL 입력 필드에 도메인 입력"},
+      {"task": 1, "url": "https://developer.mozilla.org/en-US/observatory", "label": "스캔 실행", "hint": "Scan 클릭 → 분석 대기"},
+      {"task": 2, "url": "https://developer.mozilla.org/en-US/observatory", "label": "점수 확인", "hint": "70점 이상(C등급) 목표"},
+      {"task": 3, "url": "https://github.com", "label": "개선사항 반영", "hint": "권장사항에 따라 헤더/코드 수정"},
+      {"task": 4, "url": "https://developer.mozilla.org/en-US/observatory", "label": "재스캔", "hint": "수정 후 재스캔"},
+      {"task": 5, "url": null, "label": "완료 기록", "hint": "최종 점수 기록"}
+    ]
+  },
+  "s8_3": {
+    "nav": [
+      {"task": 0, "url": "https://www.ssllabs.com/ssltest/", "label": "SSL Labs 접속", "hint": "Hostname 입력란에 도메인 입력"},
+      {"task": 1, "url": "https://www.ssllabs.com/ssltest/", "label": "테스트 시작", "hint": "Submit 클릭 → 분석 대기 (1-2분)"},
+      {"task": 2, "url": "https://www.ssllabs.com/ssltest/", "label": "등급 확인", "hint": "Overall Rating A+ 목표"},
+      {"task": 3, "url": "https://dash.cloudflare.com", "label": "SSL 설정 확인", "hint": "Cloudflare → SSL/TLS → Full (strict) 확인"},
+      {"task": 4, "url": "https://dash.cloudflare.com", "label": "HSTS 활성화", "hint": "Edge Certificates → HSTS 활성화"},
+      {"task": 5, "url": "https://www.ssllabs.com/ssltest/", "label": "재테스트", "hint": "설정 변경 후 재테스트"},
+      {"task": 6, "url": null, "label": "완료 기록", "hint": "최종 SSL 등급 기록"}
+    ]
+  }
+}

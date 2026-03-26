@@ -1,12 +1,12 @@
 module.exports = {
   apps: [
     {
-      name: 'stellar-edu',
+      name: 'stellar-edu-v8',
       script: 'npx',
-      args: 'wrangler pages dev dist --ip 0.0.0.0 --port 3000',
+      args: 'wrangler pages dev dist --ip 0.0.0.0 --port 3001',
       env: {
         NODE_ENV: 'development',
-        PORT: 3000
+        PORT: 3001
       },
       watch: false,
       instances: 1,

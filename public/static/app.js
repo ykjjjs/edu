@@ -1,6 +1,7 @@
 /* ═══════════════════════════════════════════════════════
-   STELLAR EDU — Main Application
-   콘솔 에러 0개를 목표로 한 클린 아키텍처
+   STELLAR EDU v8.1 — Navigator Turbo Edition
+   즉시 체크 + 원클릭 네비게이션 + 자동 iframe 전환
+   학생 체감 속도 3배 향상
    ═══════════════════════════════════════════════════════ */
 (function() {
 'use strict';
@@ -57,8 +58,6 @@ function spawnShootingStar() {
 function drawStars() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   var time = Date.now() * 0.001;
-
-  /* Regular stars */
   for (var i = 0; i < stars.length; i++) {
     var s = stars[i];
     s.x += s.dx; s.y += s.dy;
@@ -71,7 +70,6 @@ function drawStars() {
     ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(' + s.color[0] + ',' + s.color[1] + ',' + s.color[2] + ',' + alpha + ')';
     ctx.fill();
-    /* Add subtle glow to larger stars */
     if (s.r > 1.2) {
       ctx.beginPath();
       ctx.arc(s.x, s.y, s.r * 3, 0, Math.PI * 2);
@@ -79,74 +77,66 @@ function drawStars() {
       ctx.fill();
     }
   }
-
-  /* Shooting stars */
   spawnShootingStar();
   for (var j = shootingStars.length - 1; j >= 0; j--) {
     var ss = shootingStars[j];
     ss.x += ss.dx; ss.y += ss.dy;
     ss.life -= ss.decay;
     if (ss.life <= 0 || ss.x > canvas.width || ss.y > canvas.height) {
-      shootingStars.splice(j, 1);
-      continue;
+      shootingStars.splice(j, 1); continue;
     }
     ctx.save();
-    var grad = ctx.createLinearGradient(ss.x, ss.y, ss.x - ss.dx * (ss.len / Math.sqrt(ss.dx*ss.dx+ss.dy*ss.dy)), ss.y - ss.dy * (ss.len / Math.sqrt(ss.dx*ss.dx+ss.dy*ss.dy)));
+    var spd = Math.sqrt(ss.dx*ss.dx+ss.dy*ss.dy);
+    var grad = ctx.createLinearGradient(ss.x, ss.y, ss.x - ss.dx * (ss.len/spd), ss.y - ss.dy * (ss.len/spd));
     grad.addColorStop(0, 'rgba(200,230,255,' + (ss.life * 0.9) + ')');
     grad.addColorStop(0.3, 'rgba(100,200,255,' + (ss.life * 0.4) + ')');
     grad.addColorStop(1, 'rgba(100,180,255,0)');
-    ctx.strokeStyle = grad;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(ss.x, ss.y);
-    var tailLen = ss.len * ss.life;
-    ctx.lineTo(ss.x - ss.dx * (tailLen / Math.sqrt(ss.dx*ss.dx+ss.dy*ss.dy)), ss.y - ss.dy * (tailLen / Math.sqrt(ss.dx*ss.dx+ss.dy*ss.dy)));
+    ctx.strokeStyle = grad; ctx.lineWidth = 1.5;
+    ctx.beginPath(); ctx.moveTo(ss.x, ss.y);
+    var tl = ss.len * ss.life;
+    ctx.lineTo(ss.x - ss.dx*(tl/spd), ss.y - ss.dy*(tl/spd));
     ctx.stroke();
-    /* Head glow */
-    ctx.beginPath();
-    ctx.arc(ss.x, ss.y, 2, 0, Math.PI * 2);
+    ctx.beginPath(); ctx.arc(ss.x, ss.y, 2, 0, Math.PI * 2);
     ctx.fillStyle = 'rgba(220,240,255,' + (ss.life * 0.8) + ')';
-    ctx.fill();
-    ctx.restore();
+    ctx.fill(); ctx.restore();
   }
-
   requestAnimationFrame(drawStars);
 }
 
-resizeCanvas();
-initStars();
-drawStars();
-window.addEventListener('resize', function() {
-  resizeCanvas();
-  initStars();
-});
+resizeCanvas(); initStars(); drawStars();
+window.addEventListener('resize', function() { resizeCanvas(); initStars(); });
 
 /* ─── DATA LOADING ───────────────────────────── */
 var PH = [];
+var NAV_DATA = {};
 var dataLoaded = false;
 
 function loadData(callback) {
-  var xhr = new XMLHttpRequest();
-  xhr.open('GET', '/static/phases.json', true);
-  xhr.onload = function() {
-    if (xhr.status === 200) {
-      try {
-        PH = JSON.parse(xhr.responseText);
-        dataLoaded = true;
-        callback();
-      } catch(e) {
-        console.error('JSON parse error:', e);
-      }
-    }
+  var loaded = 0;
+  var total = 2;
+  function check() { loaded++; if (loaded >= total) { dataLoaded = true; callback(); } }
+
+  var xhr1 = new XMLHttpRequest();
+  xhr1.open('GET', '/static/phases.json', true);
+  xhr1.onload = function() {
+    if (xhr1.status === 200) { try { PH = JSON.parse(xhr1.responseText); } catch(e) {} }
+    check();
   };
-  xhr.onerror = function() {
-    console.error('Failed to load phases data');
+  xhr1.onerror = check;
+  xhr1.send();
+
+  var xhr2 = new XMLHttpRequest();
+  xhr2.open('GET', '/static/nav-data.json', true);
+  xhr2.onload = function() {
+    if (xhr2.status === 200) { try { NAV_DATA = JSON.parse(xhr2.responseText); } catch(e) {} }
+    check();
   };
-  xhr.send();
+  xhr2.onerror = check;
+  xhr2.send();
 }
 
 /* ─── STATE ──────────────────────────────────── */
-var SK = 'stellar_edu_v7';
+var SK = 'stellar_edu_v8';
 var st = {};
 var pts = [];
 var curUser = null;
@@ -168,15 +158,12 @@ function setDone(id, v) { st[id] = v; saveSt(); }
 function allSteps() {
   var r = [];
   for (var i = 0; i < PH.length; i++) {
-    for (var j = 0; j < PH[i].steps.length; j++) {
-      r.push(PH[i].steps[j]);
-    }
+    for (var j = 0; j < PH[i].steps.length; j++) r.push(PH[i].steps[j]);
   }
   return r;
 }
 function totalDone() {
-  var steps = allSteps();
-  var c = 0;
+  var steps = allSteps(), c = 0;
   for (var i = 0; i < steps.length; i++) { if (isDone(steps[i].id)) c++; }
   return c;
 }
@@ -186,16 +173,12 @@ function pDone(p) {
   return c;
 }
 function esc(s) {
-  return String(s || '')
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 /* ─── AUTH ────────────────────────────────────── */
 document.getElementById('gBtn').addEventListener('click', function() {
-  var e = prompt('구글 이메일 입력 (데모):', 'user@gmail.com');
+  var e = prompt('\uad6c\uae00 \uc774\uba54\uc77c \uc785\ub825 (\ub370\ubaa8):', 'user@gmail.com');
   if (e) launch(e);
 });
 document.getElementById('demoBtn').addEventListener('click', function() {
@@ -206,6 +189,7 @@ document.getElementById('logoutBtn').addEventListener('click', function() {
   curUser = null;
   document.getElementById('appShell').classList.remove('on');
   document.getElementById('loginScreen').style.display = 'flex';
+  exitNavMode();
 });
 
 function launch(email) {
@@ -252,7 +236,6 @@ function renderSidebar() {
   }
   menu.innerHTML = html;
 
-  // Attach events using event delegation instead of individual listeners
   menu.onclick = function(e) {
     var phHdr = e.target.closest('.sb-phase-hdr');
     if (phHdr) {
@@ -265,13 +248,13 @@ function renderSidebar() {
     if (step) {
       var sid = step.getAttribute('data-sid');
       var phid = step.getAttribute('data-phid');
+      exitNavMode();
       showPhaseView(phid);
       setTimeout(function() { openModal(sid); }, 100);
       document.getElementById('sidebar').classList.remove('open');
     }
   };
 
-  // Footer
   var done2 = totalDone();
   var total2 = allSteps().length;
   var pct = total2 ? Math.round(done2 / total2 * 100) : 0;
@@ -281,8 +264,7 @@ function renderSidebar() {
 
 function updateTopPct() {
   if (!dataLoaded) return;
-  var done = totalDone();
-  var total = allSteps().length;
+  var done = totalDone(), total = allSteps().length;
   var pct = total ? Math.round(done / total * 100) : 0;
   document.getElementById('topPct').textContent = pct + '%';
 }
@@ -291,8 +273,7 @@ function updateTopPct() {
 function showWelcome() {
   if (!dataLoaded) return;
   curPhId = null;
-  var done = totalDone();
-  var total = allSteps().length;
+  var done = totalDone(), total = allSteps().length;
   var pct = total ? Math.round(done / total * 100) : 0;
 
   var html = '<div class="welcome-hero"><div class="wh-inner">'
@@ -309,8 +290,7 @@ function showWelcome() {
 
   for (var i = 0; i < PH.length; i++) {
     var p = PH[i];
-    var d = pDone(p);
-    var t = p.steps.length;
+    var d = pDone(p), t = p.steps.length;
     var pct2 = Math.round(d / t * 100);
     html += '<div class="ph-card" data-phid="' + p.id + '">'
       + '<div class="ph-card-top">'
@@ -325,13 +305,9 @@ function showWelcome() {
 
   var ci = document.getElementById('contentInner');
   ci.innerHTML = html;
-
-  // Event delegation for phase cards
   ci.onclick = function(e) {
     var card = e.target.closest('.ph-card');
-    if (card) {
-      showPhaseView(card.getAttribute('data-phid'));
-    }
+    if (card) showPhaseView(card.getAttribute('data-phid'));
   };
 }
 
@@ -339,17 +315,13 @@ function showWelcome() {
 function showPhaseView(phId) {
   if (!dataLoaded) return;
   curPhId = phId;
-  var phase = null;
-  var pi = -1;
+  var phase = null, pi = -1;
   for (var i = 0; i < PH.length; i++) {
     if (PH[i].id === phId) { phase = PH[i]; pi = i; break; }
   }
   if (!phase) return;
 
-  var done = pDone(phase);
-  var total = phase.steps.length;
-  var allDone2 = done === total;
-
+  var done = pDone(phase), total = phase.steps.length, allDone2 = done === total;
   var ci = document.getElementById('contentInner');
   var html = '<button class="back-btn" id="backBtn">&larr; \ub300\uc2dc\ubcf4\ub4dc\ub85c \ub3cc\uc544\uac00\uae30</button>';
 
@@ -363,10 +335,7 @@ function showPhaseView(phId) {
     + '<div class="ph-badge' + (allDone2 ? ' done' : '') + '">' + done + '/' + total + ' \uc644\ub8cc</div>'
     + '</div>';
 
-  // Patient section for phase p4
-  if (phId === 'p4') {
-    html += buildPatientSection() + buildCryptoDemo();
-  }
+  if (phId === 'p4') html += buildPatientSection() + buildCryptoDemo();
 
   html += '<div class="steps-list">';
   for (var si = 0; si < phase.steps.length; si++) {
@@ -375,22 +344,13 @@ function showPhaseView(phId) {
   html += '</div>';
 
   ci.innerHTML = html;
-
-  // Event delegation for all clicks in content
   ci.onclick = function(e) {
-    // Back button
-    if (e.target.closest('#backBtn')) {
-      showWelcome();
-      return;
-    }
-    // Step card buttons
+    if (e.target.closest('#backBtn')) { showWelcome(); return; }
     var stepEl = e.target.closest('[data-step-id]');
-    if (stepEl) {
-      e.stopPropagation();
-      openModal(stepEl.getAttribute('data-step-id'));
-      return;
-    }
-    // Patient actions
+    if (stepEl && !e.target.closest('.sc-nav-btn')) { e.stopPropagation(); openModal(stepEl.getAttribute('data-step-id')); return; }
+    /* Nav mode launch button */
+    var navBtn = e.target.closest('[data-nav-step]');
+    if (navBtn) { e.stopPropagation(); enterNavMode(navBtn.getAttribute('data-nav-step')); return; }
     if (e.target.closest('#ptAddBtn')) { openPatientForm(); return; }
     if (e.target.closest('#ptSampleBtn')) { loadSamples(); return; }
     if (e.target.closest('#ptSqlBtn')) { genSQL(); return; }
@@ -400,14 +360,12 @@ function showPhaseView(phId) {
       }
       return;
     }
-    // Delete patient
     var delBtn = e.target.closest('.pt-del');
     if (delBtn) {
       var idx = parseInt(delBtn.getAttribute('data-idx'));
       if (!isNaN(idx)) { pts.splice(idx, 1); saveSt(); showPhaseView('p4'); }
       return;
     }
-    // Crypto buttons
     if (e.target.closest('#encBtn')) { doCryptoEnc(); return; }
     if (e.target.closest('#decBtn')) { doCryptoDec(); return; }
     if (e.target.closest('#matchBtn')) { doCryptoMatch(); return; }
@@ -419,6 +377,8 @@ function showPhaseView(phId) {
 
 function renderStepCard(s, pi, si) {
   var done = isDone(s.id);
+  var hasNav = !!NAV_DATA[s.id];
+  var navCount = hasNav ? NAV_DATA[s.id].nav.length : 0;
   return '<div class="step-card' + (done ? ' dn' : '') + '" id="card_' + s.id + '">'
     + '<div class="step-card-hdr" data-step-id="' + s.id + '" style="cursor:pointer">'
     + '<div class="sc-num">' + (done ? '&#10003;' : (pi + 1) + '-' + (si + 1)) + '</div>'
@@ -430,8 +390,335 @@ function renderStepCard(s, pi, si) {
     + '</div></div>'
     + '<div class="sc-right">'
     + '<div class="sc-time">\u23f1 ' + esc(s.time) + '</div>'
-    + '<button class="sc-btn" data-step-id="' + s.id + '">' + (done ? '\ud83d\udccb \ubcf5\uc2b5' : '\u25b6 \uc9c4\uc785') + '</button>'
+    + (hasNav ? '<button class="sc-nav-btn" data-nav-step="' + s.id + '">\ud83d\ude80 \uc2e4\uc2b5 \uc2dc\uc791 <span class="sc-nav-cnt">' + navCount + '\uac1c</span></button>' : '')
+    + '<button class="sc-btn" data-step-id="' + s.id + '">' + (done ? '\ud83d\udccb \ubcf5\uc2b5' : '\u25b6 \uc0c1\uc138') + '</button>'
     + '</div></div></div>';
+}
+
+/* ═════════════════════════════════════════════════
+   NAVIGATOR MODE v2 — Turbo Edition
+   원클릭 체크 + 자동 iframe 전환 + 속도 3배
+   ═════════════════════════════════════════════════ */
+var navActive = false;
+var navStepId = null;
+var navTaskIdx = 0;
+var navSavedChecks = {};
+var navNavInfo = null;
+
+function enterNavMode(stepId) {
+  var navInfo = NAV_DATA[stepId];
+  if (!navInfo || !navInfo.nav || navInfo.nav.length === 0) {
+    openModal(stepId);
+    return;
+  }
+
+  /* Find step data */
+  var step = null, pi = -1, si = -1;
+  for (var i = 0; i < PH.length; i++) {
+    for (var j = 0; j < PH[i].steps.length; j++) {
+      if (PH[i].steps[j].id === stepId) { step = PH[i].steps[j]; pi = i; si = j; break; }
+    }
+    if (step) break;
+  }
+  if (!step) return;
+
+  navActive = true;
+  navStepId = stepId;
+  navTaskIdx = 0;
+  navNavInfo = navInfo;
+
+  /* Load task check state */
+  try { navSavedChecks = JSON.parse(localStorage.getItem(SK + '_tc_' + stepId) || '{}'); } catch(e) { navSavedChecks = {}; }
+
+  /* Find first unchecked task */
+  var firstUnchecked = 0;
+  for (var f = 0; f < navInfo.nav.length; f++) {
+    if (!navSavedChecks[f]) { firstUnchecked = f; break; }
+    if (f === navInfo.nav.length - 1) firstUnchecked = f;
+  }
+  navTaskIdx = firstUnchecked;
+
+  var navContainer = document.getElementById('navContainer');
+  var phase = PH[pi];
+
+  /* Left panel */
+  var leftHtml = '<div class="nav-header">'
+    + '<button class="nav-close-btn" id="navCloseBtn">&times;</button>'
+    + '<div class="nav-step-info">'
+    + '<span class="nav-phase-tag" style="background:' + phase.color + '22;color:' + phase.color + '">' + phase.icon + ' ' + esc(phase.title) + '</span>'
+    + '<div class="nav-step-title">' + esc(step.title) + '</div>'
+    + '<div class="nav-step-time">\u23f1 ' + esc(step.time) + ' &middot; ' + navInfo.nav.length + '\uac1c \ud56d\ubaa9</div>'
+    + '</div></div>'
+    + '<div class="nav-tasks" id="navTasks">';
+
+  for (var t = 0; t < navInfo.nav.length; t++) {
+    var ni = navInfo.nav[t];
+    var checked = navSavedChecks[t];
+    leftHtml += '<div class="nav-task' + (checked ? ' done' : '') + (t === firstUnchecked ? ' active' : '') + '" data-nav-ti="' + t + '">'
+      + '<div class="nav-task-check" data-check-ti="' + t + '">'
+      + '<div class="nav-tk">' + (checked ? '&#10003;' : (t + 1)) + '</div>'
+      + '</div>'
+      + '<div class="nav-task-body" data-goto-ti="' + t + '">'
+      + '<div class="nav-task-label">' + esc(ni.label) + '</div>'
+      + '<div class="nav-task-hint">' + esc(ni.hint) + '</div>'
+      + (ni.url ? '<div class="nav-task-url">\ud83c\udf10 ' + esc(ni.url.replace(/^https?:\/\//,'').substring(0,45)) + '</div>' : '<div class="nav-task-url local">\ud83d\udcbb \ub85c\uceec \uc791\uc5c5</div>')
+      + '</div>'
+      + '</div>';
+  }
+
+  leftHtml += '</div>'
+    + '<div class="nav-footer">'
+    + '<div class="nav-progress-txt" id="navProgressTxt">0 / ' + navInfo.nav.length + ' \uc644\ub8cc</div>'
+    + '<div class="nav-progress-bar"><div class="nav-progress-fill" id="navProgressFill" style="width:0%"></div></div>'
+    + '<div class="nav-footer-btns">'
+    + '<button class="nav-prev-btn" id="navPrevBtn">\u25c0 \uc774\uc804</button>'
+    + '<button class="nav-next-btn" id="navNextBtn">\ub2e4\uc74c \u25b6</button>'
+    + '</div>'
+    + '<button class="nav-complete-btn" id="navCompleteBtn">\u2705 \ub2e8\uacc4 \uc804\uccb4 \uc644\ub8cc</button>'
+    + '</div>';
+
+  document.getElementById('navLeft').innerHTML = leftHtml;
+
+  /* Set iframe to first unchecked task */
+  navigateIframe(firstUnchecked, navInfo);
+
+  /* Show navigator */
+  navContainer.classList.add('on');
+  document.getElementById('appShell').style.display = 'none';
+
+  /* Update progress */
+  updateNavProgress(navInfo, navSavedChecks);
+
+  /* === EVENT HANDLERS === */
+
+  document.getElementById('navCloseBtn').addEventListener('click', exitNavMode);
+
+  document.getElementById('navCompleteBtn').addEventListener('click', function() {
+    completeStep(navStepId);
+    exitNavMode();
+  });
+
+  /* Prev/Next buttons */
+  document.getElementById('navPrevBtn').addEventListener('click', function() {
+    if (navTaskIdx > 0) {
+      navTaskIdx--;
+      setActiveNavTask(navTaskIdx, navNavInfo, true);
+    }
+  });
+  document.getElementById('navNextBtn').addEventListener('click', function() {
+    if (navTaskIdx < navNavInfo.nav.length - 1) {
+      navTaskIdx++;
+      setActiveNavTask(navTaskIdx, navNavInfo, true);
+    }
+  });
+
+  /* Task interaction — separated check vs navigate */
+  var navTasks = document.getElementById('navTasks');
+  navTasks.addEventListener('click', function(e) {
+    /* Check button area — toggle check ONLY */
+    var checkArea = e.target.closest('[data-check-ti]');
+    if (checkArea) {
+      var ci2 = parseInt(checkArea.getAttribute('data-check-ti'));
+      if (isNaN(ci2)) return;
+      toggleNavCheck(ci2);
+      return;
+    }
+
+    /* Task body area — navigate iframe + set active */
+    var gotoArea = e.target.closest('[data-goto-ti]');
+    if (gotoArea) {
+      var gi = parseInt(gotoArea.getAttribute('data-goto-ti'));
+      if (isNaN(gi)) return;
+      navTaskIdx = gi;
+      setActiveNavTask(gi, navNavInfo, true);
+      return;
+    }
+  });
+
+  /* Keyboard shortcuts */
+  navKeyHandler = function(e) {
+    if (!navActive) return;
+    if (e.key === 'Escape') { exitNavMode(); return; }
+    /* Space = toggle check current task */
+    if (e.key === ' ' && !e.target.closest('input,textarea,select')) {
+      e.preventDefault();
+      toggleNavCheck(navTaskIdx);
+      return;
+    }
+    /* Arrow Down / Right = next task */
+    if (e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+      e.preventDefault();
+      if (navTaskIdx < navNavInfo.nav.length - 1) {
+        navTaskIdx++;
+        setActiveNavTask(navTaskIdx, navNavInfo, true);
+      }
+      return;
+    }
+    /* Arrow Up / Left = prev task */
+    if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') {
+      e.preventDefault();
+      if (navTaskIdx > 0) {
+        navTaskIdx--;
+        setActiveNavTask(navTaskIdx, navNavInfo, true);
+      }
+      return;
+    }
+    /* Enter = complete step if all done */
+    if (e.key === 'Enter') {
+      var allChecked = true;
+      for (var k = 0; k < navNavInfo.nav.length; k++) {
+        if (!navSavedChecks[k]) { allChecked = false; break; }
+      }
+      if (allChecked) {
+        completeStep(navStepId);
+        exitNavMode();
+      }
+      return;
+    }
+    /* Number keys 1-9 = jump to task */
+    var num = parseInt(e.key);
+    if (num >= 1 && num <= navNavInfo.nav.length) {
+      navTaskIdx = num - 1;
+      setActiveNavTask(navTaskIdx, navNavInfo, true);
+      return;
+    }
+  };
+  document.addEventListener('keydown', navKeyHandler);
+}
+
+var navKeyHandler = null;
+
+function toggleNavCheck(ti) {
+  navSavedChecks[ti] = !navSavedChecks[ti];
+  localStorage.setItem(SK + '_tc_' + navStepId, JSON.stringify(navSavedChecks));
+
+  /* Instant DOM update — no re-render */
+  var taskEl = document.querySelector('.nav-task[data-nav-ti="' + ti + '"]');
+  if (taskEl) {
+    var tkEl = taskEl.querySelector('.nav-tk');
+    if (navSavedChecks[ti]) {
+      taskEl.classList.add('done');
+      taskEl.classList.add('check-flash');
+      if (tkEl) tkEl.innerHTML = '&#10003;';
+      setTimeout(function() { taskEl.classList.remove('check-flash'); }, 400);
+    } else {
+      taskEl.classList.remove('done');
+      if (tkEl) tkEl.textContent = (ti + 1);
+    }
+  }
+
+  updateNavProgress(navNavInfo, navSavedChecks);
+
+  /* If checking, auto-advance to next unchecked + navigate iframe */
+  if (navSavedChecks[ti]) {
+    var nextIdx = -1;
+    for (var n = 0; n < navNavInfo.nav.length; n++) {
+      if (!navSavedChecks[n]) { nextIdx = n; break; }
+    }
+    if (nextIdx >= 0) {
+      navTaskIdx = nextIdx;
+      /* Small delay for visual feedback before advancing */
+      setTimeout(function() {
+        setActiveNavTask(nextIdx, navNavInfo, true);
+      }, 250);
+    }
+    /* If all checked, show completion glow */
+    if (nextIdx < 0) {
+      showNavToast('\ud83c\udf89 \ubaa8\ub4e0 \ud56d\ubaa9 \uc644\ub8cc! Enter\ub85c \ub2e8\uacc4 \uc644\ub8cc');
+    }
+  }
+}
+
+function setActiveNavTask(idx, navInfo, navigate) {
+  var tasks = document.querySelectorAll('#navTasks .nav-task');
+  for (var i = 0; i < tasks.length; i++) {
+    tasks[i].classList.remove('active');
+  }
+  if (tasks[idx]) {
+    tasks[idx].classList.add('active');
+    tasks[idx].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  /* Update prev/next button states */
+  var prevBtn = document.getElementById('navPrevBtn');
+  var nextBtn = document.getElementById('navNextBtn');
+  if (prevBtn) prevBtn.disabled = (idx === 0);
+  if (nextBtn) nextBtn.disabled = (idx >= navInfo.nav.length - 1);
+
+  if (navigate) {
+    navigateIframe(idx, navInfo);
+  }
+}
+
+function navigateIframe(idx, navInfo) {
+  var ni = navInfo.nav[idx];
+  var iframe = document.getElementById('navIframe');
+  var placeholder = document.getElementById('navPlaceholder');
+  if (ni && ni.url) {
+    /* Only reload if URL actually changed */
+    var newSrc = ni.url;
+    if (iframe.src !== newSrc && iframe.getAttribute('data-last-url') !== newSrc) {
+      iframe.setAttribute('data-last-url', newSrc);
+      iframe.src = newSrc;
+    }
+    iframe.style.display = 'block';
+    placeholder.style.display = 'none';
+  } else {
+    iframe.style.display = 'none';
+    iframe.src = 'about:blank';
+    iframe.setAttribute('data-last-url', '');
+    placeholder.style.display = 'flex';
+    placeholder.innerHTML = '<div class="nav-ph-icon">\ud83d\udcbb</div><div class="nav-ph-txt">\uc774 \ub2e8\uacc4\ub294 \ub85c\uceec \uc791\uc5c5\uc785\ub2c8\ub2e4<br><span>\uc88c\uce21 \uac00\uc774\ub4dc\ub97c \ub530\ub77c \uc9c4\ud589\ud558\uc138\uc694</span></div>';
+  }
+}
+
+function updateNavProgress(navInfo, checks) {
+  var done = 0;
+  for (var i = 0; i < navInfo.nav.length; i++) { if (checks[i]) done++; }
+  var total = navInfo.nav.length;
+  var pct = Math.round(done / total * 100);
+  var txt = document.getElementById('navProgressTxt');
+  var fill = document.getElementById('navProgressFill');
+  if (txt) txt.textContent = done + ' / ' + total + ' \uc644\ub8cc (' + pct + '%)';
+  if (fill) fill.style.width = pct + '%';
+  var btn = document.getElementById('navCompleteBtn');
+  if (btn) {
+    if (done >= total) {
+      btn.classList.add('ready');
+      btn.textContent = '\u2705 \ub2e8\uacc4 \uc804\uccb4 \uc644\ub8cc (Enter)';
+    } else {
+      btn.classList.remove('ready');
+      btn.textContent = '\u2705 \ub2e8\uacc4 \uc804\uccb4 \uc644\ub8cc';
+    }
+  }
+}
+
+function showNavToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('on');
+  setTimeout(function() { t.classList.remove('on'); }, 2500);
+}
+
+function exitNavMode() {
+  navActive = false;
+  navNavInfo = null;
+  var navContainer = document.getElementById('navContainer');
+  navContainer.classList.remove('on');
+  document.getElementById('appShell').style.display = '';
+  document.getElementById('appShell').classList.add('on');
+  var iframe = document.getElementById('navIframe');
+  iframe.src = 'about:blank';
+  iframe.setAttribute('data-last-url', '');
+  if (navKeyHandler) {
+    document.removeEventListener('keydown', navKeyHandler);
+    navKeyHandler = null;
+  }
+  /* Refresh views */
+  if (curPhId) showPhaseView(curPhId);
+  else showWelcome();
+  renderSidebar();
+  updateTopPct();
 }
 
 /* ─── PATIENT SECTION ────────────────────────── */
@@ -506,9 +793,7 @@ function savePatient() {
         id: uid, name: name, gender: gen, dept: dept, status: st2,
         birth_enc: be, phone_enc: pe, created_at: new Date().toISOString()
       });
-      saveSt();
-      closeModal();
-      showPhaseView('p4');
+      saveSt(); closeModal(); showPhaseView('p4');
       showToast('\u2705 \ud658\uc790 \ucd94\uac00 & \uc554\ud638\ud654 \uc644\ub8cc!');
     });
   });
@@ -534,9 +819,7 @@ function loadSamples() {
     });
   });
   Promise.all(proms).then(function(newPts) {
-    pts = pts.concat(newPts);
-    saveSt();
-    showPhaseView('p4');
+    pts = pts.concat(newPts); saveSt(); showPhaseView('p4');
     showToast('\u2705 \uc0d8\ud50c 5\uba85 \ucd94\uac00!');
   });
 }
@@ -549,11 +832,8 @@ function genSQL() {
     }).join(',\n') + ';';
   var sql2 = 'INSERT INTO patient_sensitive (patient_id, birth_enc, phone_enc)\nVALUES\n'
     + pts.map(function(p) {
-      var be = (p.birth_enc || '').substring(0, 30) + '...';
-      var pe = (p.phone_enc || '').substring(0, 30) + '...';
-      return "  ('" + p.id + "','" + be + "','" + pe + "')";
+      return "  ('" + p.id + "','" + (p.birth_enc||'').substring(0,30) + "...','" + (p.phone_enc||'').substring(0,30) + "...')";
     }).join(',\n') + ';';
-
   var body = '<div class="m-sec"><div class="m-sec-title">SQL AUTO GENERATED</div>'
     + '<div class="tip-box">\ud83d\udca1 F12 \u2192 Console \ud0ed\uc5d0\uc11c \uc804\uccb4 SQL\uc744 \ubcf5\uc0ac\ud558\uc138\uc694.</div>'
     + '<div class="code-blk"><code>' + esc(sql1) + '\n\n' + esc(sql2) + '</code></div></div>';
@@ -570,18 +850,15 @@ function buildCryptoDemo() {
     + '<input class="ci" id="ct" value="010-1234-5678" placeholder="\uc6d0\ubcf8 \ub370\uc774\ud130">'
     + '<button class="cb" id="encBtn">\ud83d\udd12 \uc554\ud638\ud654 \uc2e4\ud589</button>'
     + '<div style="font-size:.65rem;color:var(--txt-muted);margin-top:6px;">DB\uc5d0 \uc800\uc7a5\ub418\ub294 \uc554\ud638\ubb38:</div>'
-    + '<div class="co" id="cr">\uc554\ud638\ud654 \ubc84\ud2bc\uc744 \ub20c\ub7ec\ubcf4\uc138\uc694...</div>'
-    + '</div>'
+    + '<div class="co" id="cr">\uc554\ud638\ud654 \ubc84\ud2bc\uc744 \ub20c\ub7ec\ubcf4\uc138\uc694...</div></div>'
     + '<div class="crypto-panel"><div class="cp-title">\ud83d\udd13 DECRYPT</div>'
     + '<input class="ci" id="dk" type="password" value="hospitalKey2024!" placeholder="\ubcf5\ud638\ud654 \ud0a4">'
     + '<input class="ci" id="dc" placeholder="\uc554\ud638\ubb38 (\uc790\ub3d9 \ucc44\uc6cc\uc9d0)">'
     + '<button class="cb" id="decBtn">\ud83d\udd13 \ubcf5\ud638\ud654 \uc2e4\ud589</button>'
     + '<div style="font-size:.65rem;color:var(--txt-muted);margin-top:6px;">\ubcf5\ud638\ud654 \uacb0\uacfc:</div>'
-    + '<div class="co ok" id="dr">\ubcf5\ud638\ud654 \ubc84\ud2bc\uc744 \ub20c\ub7ec\ubcf4\uc138\uc694...</div>'
-    + '</div></div>'
+    + '<div class="co ok" id="dr">\ubcf5\ud638\ud654 \ubc84\ud2bc\uc744 \ub20c\ub7ec\ubcf4\uc138\uc694...</div></div></div>'
     + '<button class="cb" style="margin-top:10px;max-width:260px;" id="matchBtn">\ud83d\udd04 \uc6d0\ubcf8 \u2194 \ubcf5\ud638\ud654 \ub9e4\uce6d \uac80\uc99d</button>'
-    + '<div class="crypto-match" id="cm"></div>'
-    + '</div>';
+    + '<div class="crypto-match" id="cm"></div></div>';
 }
 
 /* ─── CRYPTO FUNCTIONS ───────────────────────── */
@@ -614,16 +891,13 @@ function decryptData(b64, pw) {
   if (!b64) return Promise.resolve('');
   try {
     var bytes = Uint8Array.from(atob(b64), function(c) { return c.charCodeAt(0); });
-    var iv = bytes.slice(0, 12);
-    var data = bytes.slice(12);
+    var iv = bytes.slice(0, 12), data = bytes.slice(12);
     return deriveKey(pw).then(function(key) {
       return crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, key, data);
     }).then(function(dec) {
       return new TextDecoder().decode(dec);
     }).catch(function() { return 'DECRYPT_FAILED'; });
-  } catch(e) {
-    return Promise.resolve('DECRYPT_FAILED');
-  }
+  } catch(e) { return Promise.resolve('DECRYPT_FAILED'); }
 }
 
 function doCryptoEnc() {
@@ -643,10 +917,7 @@ function doCryptoDec() {
   if (!pw || !ci2) { alert('\ud0a4\uc640 \uc554\ud638\ubb38\uc744 \uc785\ub825\ud558\uc138\uc694.'); return; }
   decryptData(ci2, pw).then(function(r) {
     var el = document.getElementById('dr');
-    if (el) {
-      el.textContent = r;
-      el.className = 'co ' + (r === 'DECRYPT_FAILED' ? 'err' : 'ok');
-    }
+    if (el) { el.textContent = r; el.className = 'co ' + (r === 'DECRYPT_FAILED' ? 'err' : 'ok'); }
   });
 }
 
@@ -655,8 +926,7 @@ function doCryptoMatch() {
   var decEl = document.getElementById('dr');
   var cmEl = document.getElementById('cm');
   if (!origEl || !decEl || !cmEl) return;
-  var orig = origEl.value;
-  var dec2 = decEl.textContent;
+  var orig = origEl.value, dec2 = decEl.textContent;
   if (!orig || dec2.indexOf('\ubc84\ud2bc') !== -1 || dec2 === 'DECRYPT_FAILED') {
     cmEl.className = 'crypto-match fail';
     cmEl.textContent = '\u274c \uba3c\uc800 \uc554\ud638\ud654 \u2192 \ubcf5\ud638\ud654\ub97c \uc21c\uc11c\ub300\ub85c \uc2e4\ud589\ud558\uc138\uc694';
@@ -689,31 +959,39 @@ function openGenericModal(icon, title, num, bodyHtml, doneLabel, doneHandler) {
 }
 
 function openModal(stepId) {
-  var step = null;
-  var pi = -1;
-  var si = -1;
+  var step = null, pi = -1, si = -1;
   for (var i = 0; i < PH.length; i++) {
     for (var j = 0; j < PH[i].steps.length; j++) {
-      if (PH[i].steps[j].id === stepId) {
-        step = PH[i].steps[j];
-        pi = i; si = j;
-        break;
-      }
+      if (PH[i].steps[j].id === stepId) { step = PH[i].steps[j]; pi = i; si = j; break; }
     }
     if (step) break;
   }
   if (!step) return;
-  curStep = stepId;
-  tSt = {};
+  curStep = stepId; tSt = {};
+
+  /* Load saved modal checklist state */
+  var savedModalChecks = {};
+  try { savedModalChecks = JSON.parse(localStorage.getItem(SK + '_mc_' + stepId) || '{}'); } catch(e) {}
+  tSt = savedModalChecks;
+
   var phase = PH[pi];
 
   document.getElementById('mIcon').textContent = phase.icon;
   document.getElementById('mIcon').style.background = phase.color + '20';
   document.getElementById('mIcon').style.color = phase.color;
-  document.getElementById('mNum').textContent = phase.icon + ' ' + phase.title + ' \u2014 \ub2e8\uacc4 ' + (pi + 1) + '-' + (si + 1);
+  document.getElementById('mNum').textContent = phase.icon + ' ' + phase.title + ' \u2014 \ub2e8\uacc4 ' + (pi+1) + '-' + (si+1);
   document.getElementById('mTitle').textContent = step.title;
 
   var html = '<div class="m-sec"><div class="m-sec-title">MISSION OBJECTIVE</div><div class="m-desc">' + esc(step.desc) + '</div></div>';
+
+  /* Navigator launch button in modal */
+  if (NAV_DATA[stepId]) {
+    var navCount = NAV_DATA[stepId].nav.length;
+    html += '<div class="m-sec"><div class="m-nav-launch" id="mNavLaunch" data-nav-step="' + stepId + '">'
+      + '<div class="m-nav-launch-icon">\ud83d\ude80</div>'
+      + '<div class="m-nav-launch-txt"><b>\uc2e4\uc2b5 \ub124\ube44\uac8c\uc774\ud130\ub85c \uc2dc\uc791\ud558\uae30</b><br>'
+      + '<span>\uc88c\uce21 \uac00\uc774\ub4dc + \uc6b0\uce21 \uc0ac\uc774\ud2b8 iframe \xb7 ' + navCount + '\uac1c \ud56d\ubaa9 \xb7 \ud0a4\ubcf4\ub4dc \uc9c0\uc6d0</span></div></div></div>';
+  }
 
   if (step.links && step.links.length) {
     html += '<div class="m-sec"><div class="m-sec-title">QUICK LINKS</div><div class="links-row">'
@@ -723,12 +1001,12 @@ function openModal(stepId) {
   }
 
   if (step.tasks && step.tasks.length) {
-    html += '<div class="m-sec"><div class="m-sec-title">CHECKLIST</div><div class="task-list" id="tList">'
+    html += '<div class="m-sec"><div class="m-sec-title">CHECKLIST <span class="m-sec-hint">\ud074\ub9ad\uc73c\ub85c \uc989\uc2dc \uccb4\ud06c</span></div><div class="task-list" id="tList">'
       + step.tasks.map(function(t, i) {
-        return '<div class="task" data-ti="' + i + '">'
-          + '<div class="tk" id="tk_' + i + '"></div>'
-          + '<div class="task-txt">' + esc(t) + '</div>'
-          + '</div>';
+        var isChecked = !!tSt[i];
+        return '<div class="task' + (isChecked ? ' dn' : '') + '" data-ti="' + i + '">'
+          + '<div class="tk" id="tk_' + i + '">' + (isChecked ? '&#10003;' : '') + '</div>'
+          + '<div class="task-txt">' + esc(t) + '</div></div>';
       }).join('') + '</div></div>';
   }
 
@@ -742,22 +1020,32 @@ function openModal(stepId) {
   document.getElementById('mBody').innerHTML = html;
   updateMTaskSt(step);
 
-  // Attach task click events via delegation on mBody
   var mBody = document.getElementById('mBody');
   mBody.onclick = function(e) {
     var taskEl = e.target.closest('.task[data-ti]');
     if (taskEl) {
       var i = parseInt(taskEl.getAttribute('data-ti'));
       tSt[i] = !tSt[i];
+      /* Save instantly */
+      localStorage.setItem(SK + '_mc_' + stepId, JSON.stringify(tSt));
+
       var tk = document.getElementById('tk_' + i);
       if (tSt[i]) {
         taskEl.classList.add('dn');
+        taskEl.classList.add('check-flash');
         if (tk) tk.innerHTML = '&#10003;';
+        setTimeout(function() { taskEl.classList.remove('check-flash'); }, 400);
       } else {
         taskEl.classList.remove('dn');
         if (tk) tk.innerHTML = '';
       }
       updateMTaskSt(step);
+    }
+    /* Navigator launch from modal */
+    var navLaunch = e.target.closest('#mNavLaunch');
+    if (navLaunch) {
+      closeModal();
+      enterNavMode(navLaunch.getAttribute('data-nav-step'));
     }
   };
 
@@ -765,16 +1053,13 @@ function openModal(stepId) {
   var dBtn = document.getElementById('mDoneBtn');
   dBtn.textContent = done ? '\u21a9\ufe0f \uc644\ub8cc \ucde8\uc18c' : '\u2705 \uc644\ub8cc!';
   dBtn.style.background = done ? 'rgba(255,255,255,0.1)' : '';
-
   modalDoneHandler = function() { completeStep(stepId); };
-
   document.getElementById('overlay').classList.add('on');
   document.body.style.overflow = 'hidden';
 }
 
 function updateMTaskSt(step) {
-  var done = 0;
-  var keys = Object.keys(tSt);
+  var done = 0, keys = Object.keys(tSt);
   for (var i = 0; i < keys.length; i++) { if (tSt[keys[i]]) done++; }
   var total = step.tasks ? step.tasks.length : 0;
   document.getElementById('mFootL').textContent = '\uccb4\ud06c\ub9ac\uc2a4\ud2b8: ' + done + ' / ' + total + '\uac1c \uc644\ub8cc';
@@ -783,11 +1068,9 @@ function updateMTaskSt(step) {
 function closeModal() {
   document.getElementById('overlay').classList.remove('on');
   document.body.style.overflow = '';
-  curStep = null;
-  modalDoneHandler = null;
+  curStep = null; modalDoneHandler = null;
 }
 
-// Wire up modal buttons once
 document.getElementById('mCloseBtn').addEventListener('click', closeModal);
 document.getElementById('mCancelBtn').addEventListener('click', closeModal);
 document.getElementById('mDoneBtn').addEventListener('click', function() {
@@ -800,40 +1083,16 @@ document.getElementById('overlay').addEventListener('click', function(e) {
 function completeStep(stepId) {
   var wasDone = isDone(stepId);
   setDone(stepId, !wasDone);
-  var step = null;
-  var pi = -1;
-  var si = -1;
+  var step = null, pi = -1, si = -1;
   for (var i = 0; i < PH.length; i++) {
     for (var j = 0; j < PH[i].steps.length; j++) {
-      if (PH[i].steps[j].id === stepId) {
-        step = PH[i].steps[j];
-        pi = i; si = j; break;
-      }
+      if (PH[i].steps[j].id === stepId) { step = PH[i].steps[j]; pi = i; si = j; break; }
     }
     if (step) break;
   }
-  // Re-render card
-  var card = document.getElementById('card_' + stepId);
-  if (card && step) {
-    var tmpDiv = document.createElement('div');
-    tmpDiv.innerHTML = renderStepCard(step, pi, si);
-    var newCard = tmpDiv.firstChild;
-    // Attach click handlers
-    var btns = newCard.querySelectorAll('[data-step-id]');
-    for (var b = 0; b < btns.length; b++) {
-      (function(btn) {
-        btn.addEventListener('click', function(e) {
-          e.stopPropagation();
-          openModal(btn.getAttribute('data-step-id'));
-        });
-      })(btns[b]);
-    }
-    card.replaceWith(newCard);
-  }
-  renderSidebar();
-  updateTopPct();
-  closeModal();
+  renderSidebar(); updateTopPct(); closeModal();
   if (!wasDone && step) showToast('\ud83c\udf89 "' + step.title.substring(0, 16) + '\u2026" \uc644\ub8cc!');
+  if (curPhId) showPhaseView(curPhId);
 }
 
 /* ─── TOAST ──────────────────────────────────── */
@@ -853,9 +1112,7 @@ loadData(function() {
     document.getElementById('appShell').classList.add('on');
     document.getElementById('userAv').textContent = savedUser[0].toUpperCase();
     curUser = savedUser;
-    renderSidebar();
-    updateTopPct();
-    showWelcome();
+    renderSidebar(); updateTopPct(); showWelcome();
   }
 });
 
