@@ -1148,6 +1148,64 @@ body::before {
   .footer-copy { font-size: 0.6rem; }
 }
 
+/* ═══════════════════════════════════════════════
+   CHECKLIST SAVE / RESET BUTTONS
+   ═══════════════════════════════════════════════ */
+.m-check-actions {
+  display: flex; gap: 10px; margin-top: 14px; justify-content: flex-end;
+}
+.m-save-btn, .m-reset-btn {
+  padding: 8px 18px; border: none; border-radius: 8px;
+  font-size: 0.85rem; font-weight: 600; cursor: pointer;
+  transition: all 0.2s ease;
+}
+.m-save-btn {
+  background: linear-gradient(135deg, var(--neon-cyan), var(--neon-blue));
+  color: #fff; box-shadow: 0 0 12px rgba(0,240,255,0.3);
+}
+.m-save-btn:hover {
+  transform: translateY(-1px); box-shadow: 0 0 20px rgba(0,240,255,0.5);
+}
+.m-reset-btn {
+  background: rgba(255,255,255,0.08); color: var(--text-dim);
+  border: 1px solid rgba(255,255,255,0.12);
+}
+.m-reset-btn:hover {
+  background: rgba(255,45,120,0.15); color: var(--neon-pink);
+  border-color: var(--neon-pink);
+}
+.m-sec-hint {
+  font-size: 0.7rem; color: var(--neon-amber); margin-left: 8px; font-weight: 400;
+}
+.check-flash {
+  animation: checkFlash 0.4s ease;
+}
+@keyframes checkFlash {
+  0% { background: rgba(0,240,255,0.25); }
+  100% { background: transparent; }
+}
+
+/* ═══════════════════════════════════════════════
+   AI LAB CONVERSION LINKS
+   ═══════════════════════════════════════════════ */
+.ai-lab-conv {
+  background: rgba(168,85,246,0.08); border: 1px dashed rgba(168,85,246,0.3);
+  border-radius: 10px; padding: 10px 14px; margin-top: 8px;
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+}
+.ai-conv-label {
+  font-size: 0.78rem; color: var(--neon-purple); font-weight: 600;
+  margin-right: 4px; white-space: nowrap;
+}
+.ai-link.conv {
+  background: rgba(168,85,246,0.15); border-color: rgba(168,85,246,0.3);
+  color: #d8b4fe;
+}
+.ai-link.conv:hover {
+  background: rgba(168,85,246,0.3); border-color: var(--neon-purple);
+  color: #fff; box-shadow: 0 0 12px rgba(168,85,246,0.3);
+}
+
 /* ─── FOOTER ─────────────────────────────────────── */
 .site-footer {
   background: rgba(3,0,20,0.85);
