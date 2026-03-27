@@ -1393,10 +1393,55 @@ body::before {
   background: #fff;
 }
 
+/* ─── CHECKLIST SAVE / RESET BUTTONS ──────────────── */
+.m-check-actions {
+  display: flex; gap: 10px; margin-top: 14px; padding-top: 12px;
+  border-top: 1px solid var(--border-dim);
+  justify-content: flex-end;
+}
+.m-save-btn, .m-reset-btn {
+  padding: 8px 18px; border: none; border-radius: 8px;
+  font-family: var(--font-body); font-size: 0.82rem; font-weight: 600;
+  cursor: pointer; transition: all 0.2s;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.m-save-btn {
+  background: linear-gradient(135deg, var(--neon-green), #20c997);
+  color: #000; box-shadow: 0 0 12px rgba(57,255,20,0.25);
+}
+.m-save-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 20px rgba(57,255,20,0.45);
+}
+.m-reset-btn {
+  background: rgba(255,255,255,0.08);
+  color: var(--txt-secondary);
+  border: 1px solid var(--border-dim);
+}
+.m-reset-btn:hover {
+  background: rgba(255,45,120,0.12);
+  color: var(--neon-pink);
+  border-color: rgba(255,45,120,0.3);
+}
+.task.dn .tk {
+  background: rgba(57,255,20,0.15);
+  border-color: var(--neon-green) !important;
+  color: var(--neon-green);
+}
+.task.check-flash {
+  animation: checkFlash 0.4s ease;
+}
+@keyframes checkFlash {
+  0% { background: rgba(57,255,20,0.2); }
+  100% { background: transparent; }
+}
+
 @media (max-width: 720px) {
   .ai-pred-grid { grid-template-columns: 1fr; }
   .ai-html-form { grid-template-columns: 1fr; }
   .ai-lab-links { flex-direction: column; }
   .ai-res-header { flex-direction: column; }
   .ai-lab-tabs { overflow-x: auto; }
+  .m-check-actions { flex-direction: column; }
+  .m-save-btn, .m-reset-btn { width: 100%; justify-content: center; }
 }

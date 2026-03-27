@@ -993,30 +993,42 @@
       },
       {
         "task": 3,
+        "url": "https://www.convertcsv.com/excel-to-csv.htm",
+        "label": "Excel → CSV 변환",
+        "hint": "ConvertCSV에서 Excel 파일을 CSV로 변환"
+      },
+      {
+        "task": 4,
+        "url": "https://www.convertcsv.com/csv-to-json.htm",
+        "label": "CSV → JSON 변환",
+        "hint": "ConvertCSV에서 CSV를 JSON으로 변환 (또는 csvjson.com 사용)"
+      },
+      {
+        "task": 5,
         "url": null,
         "label": "AI Lab에서 가상 CSV 생성",
         "hint": "이 페이지 하단의 AI Lab → CSV 생성 버튼 클릭"
       },
       {
-        "task": 4,
+        "task": 6,
         "url": null,
         "label": "CSV 데이터 미리보기",
         "hint": "생성된 데이터를 테이블로 미리보기"
       },
       {
-        "task": 5,
+        "task": 7,
         "url": null,
         "label": "데이터 자동 가공",
         "hint": "자동 가공 버튼 → 결측치 처리, 정규화, 인코딩 실행"
       },
       {
-        "task": 6,
+        "task": 8,
         "url": "https://console.cloud.google.com/storage/browser",
         "label": "GCP Storage 버킷 생성",
         "hint": "Cloud Storage → Create bucket → user_data 생성"
       },
       {
-        "task": 7,
+        "task": 9,
         "url": "https://console.cloud.google.com/storage/browser",
         "label": "CSV 업로드",
         "hint": "사용자 ID별 폴더 생성 후 CSV 파일 업로드"

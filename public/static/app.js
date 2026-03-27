@@ -1039,6 +1039,17 @@ function buildAILabSection() {
     + '\ud83d\uddc4 BigQuery Public Data</a>'
     + '</div>'
 
+    /* File Conversion Tools */
+    + '<div class="ai-lab-links ai-lab-conv">'
+    + '<span class="ai-conv-label">\ud83d\udd04 \ud30c\uc77c \ubcc0\ud658 \ub3c4\uad6c:</span>'
+    + '<a class="ai-link conv" href="https://www.convertcsv.com/excel-to-csv.htm" target="_blank" rel="noopener">'
+    + '\ud83d\udcca Excel \u2192 CSV</a>'
+    + '<a class="ai-link conv" href="https://www.convertcsv.com/csv-to-json.htm" target="_blank" rel="noopener">'
+    + '\ud83d\udcdd CSV \u2192 JSON</a>'
+    + '<a class="ai-link conv" href="https://csvjson.com/csv2json" target="_blank" rel="noopener">'
+    + '\u26a1 CSVJSON (\ub300\uc548)</a>'
+    + '</div>'
+
     /* Tab Navigation */
     + '<div class="ai-lab-tabs">'
     + '<button class="ai-tab' + (aiLabTab==='dataset' ? ' active' : '') + '" data-aitab="dataset">\ud83d\udccb \ub370\uc774\ud130\uc14b</button>'
@@ -1459,13 +1470,17 @@ function openModal(stepId) {
   }
 
   if (step.tasks && step.tasks.length) {
-    html += '<div class="m-sec"><div class="m-sec-title">CHECKLIST <span class="m-sec-hint">\ud074\ub9ad\uc73c\ub85c \uc989\uc2dc \uccb4\ud06c</span></div><div class="task-list" id="tList">'
+    html += '<div class="m-sec"><div class="m-sec-title">CHECKLIST <span class="m-sec-hint">체크 후 💾저장 버튼으로 이수 업데이트</span></div><div class="task-list" id="tList">'
       + step.tasks.map(function(t, i) {
         var isChecked = !!tSt[i];
         return '<div class="task' + (isChecked ? ' dn' : '') + '" data-ti="' + i + '">'
           + '<div class="tk" id="tk_' + i + '">' + (isChecked ? '&#10003;' : '') + '</div>'
           + '<div class="task-txt">' + esc(t) + '</div></div>';
-      }).join('') + '</div></div>';
+      }).join('') + '</div>'
+      + '<div class="m-check-actions">'
+      + '<button class="m-save-btn" id="mSaveChecks">\ud83d\udcbe \uccb4\ud06c \uc800\uc7a5</button>'
+      + '<button class="m-reset-btn" id="mResetChecks">\ud83d\udd04 \uccb4\ud06c \ucd08\uae30\ud654</button>'
+      + '</div></div>';
   }
 
   if (step.code) html += '<div class="m-sec"><div class="m-sec-title">CODE / SQL</div><div class="code-blk"><code>' + esc(step.code) + '</code></div></div>';
@@ -1485,6 +1500,73 @@ function openModal(stepId) {
       if (tSt[i]) { taskEl.classList.add('dn'); taskEl.classList.add('check-flash'); if (tk) tk.innerHTML = '&#10003;'; setTimeout(function() { taskEl.classList.remove('check-flash'); }, 400); }
       else { taskEl.classList.remove('dn'); if (tk) tk.innerHTML = ''; }
       updateMTaskSt(step);
+    }
+    var saveBtn = e.target.closest('#mSaveChecks');
+    if (saveBtn) {
+      localStorage.setItem(SK + '_mc_' + stepId, JSON.stringify(tSt));
+      /* Auto-complete step if all tasks checked, or uncomplete if not all done */
+      var total = step.tasks ? step.tasks.length : 0;
+      var checked = 0;
+      for (var k in tSt) { if (tSt[k]) checked++; }
+      if (total > 0 && checked >= total) {
+        /* All tasks done → mark step as complete */
+        if (!isDone(stepId)) {
+          setDone(stepId, true);
+          renderSidebar(); updateTopPct();
+          if (curPhId) showPhaseView(curPhId);
+          showToast('🎉 모든 체크 완료! 과정 이수 처리됨');
+        } else {
+          showToast('💾 체크리스트 저장 완료!');
+        }
+      } else {
+        /* Not all done → unmark step if was completed */
+        if (isDone(stepId)) {
+          setDone(stepId, false);
+          renderSidebar(); updateTopPct();
+          if (curPhId) showPhaseView(curPhId);
+          showToast('💾 저장 완료 (미완료 항목 있음 → 이수 해제)');
+        } else {
+          showToast('💾 체크리스트 저장 완료!');
+        }
+      }
+      debounceSyncToServer();
+      /* Update done button state in modal */
+      var dBtnUp = document.getElementById('mDoneBtn');
+      var nowDone = isDone(stepId);
+      if (dBtnUp) {
+        dBtnUp.textContent = nowDone ? '↩️ 완료 취소' : '✅ 완료!';
+        dBtnUp.style.background = nowDone ? 'rgba(255,255,255,0.1)' : '';
+      }
+      return;
+    }
+    var resetBtn = e.target.closest('#mResetChecks');
+    if (resetBtn) {
+      if (confirm('이 단계의 체크리스트를 초기화하시겠습니까?\n(이수 상태도 해제됩니다)')) {
+        tSt = {};
+        localStorage.setItem(SK + '_mc_' + stepId, JSON.stringify(tSt));
+        /* Uncomplete step if it was completed */
+        if (isDone(stepId)) {
+          setDone(stepId, false);
+          renderSidebar(); updateTopPct();
+          if (curPhId) showPhaseView(curPhId);
+        }
+        debounceSyncToServer();
+        var tasks = document.querySelectorAll('#tList .task');
+        for (var ti = 0; ti < tasks.length; ti++) {
+          tasks[ti].classList.remove('dn');
+          var tkEl = tasks[ti].querySelector('.tk');
+          if (tkEl) tkEl.innerHTML = '';
+        }
+        updateMTaskSt(step);
+        /* Update done button state in modal */
+        var dBtnRst = document.getElementById('mDoneBtn');
+        if (dBtnRst) {
+          dBtnRst.textContent = '✅ 완료!';
+          dBtnRst.style.background = '';
+        }
+        showToast('🔄 체크리스트 초기화 & 이수 해제 완료');
+      }
+      return;
     }
     var navLaunch = e.target.closest('#mNavLaunch');
     if (navLaunch) { closeModal(); enterNavMode(navLaunch.getAttribute('data-nav-step')); }
